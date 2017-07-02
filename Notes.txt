@@ -1,0 +1,4 @@
+See atmega manual on page 214
+registers addresses on page 613
+timer/counter0 page 93
+timer/counter registers description page 104
