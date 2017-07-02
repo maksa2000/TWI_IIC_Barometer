@@ -36,3 +36,6 @@ ATMEGA328P_REGISTER_CODES = 0 	; define ATMEGA328P_REGISTER_CODES
 .equ OCR0B, 0x28			; Output Compare Register B (I/O port address)
 .equ TIMSK0, 0x6E			; Timer/Counter Interrupt Mask Register
 .equ TIFR0, 0x15			; Timer/Counter Interrupt Flag Register (I/O port address)
+; watchdog registers
+.equ MCUSR, 0x34			; MCU status register I/O port address
+.equ WDTCSR, 0x60			; Watchdog Timer Control Register

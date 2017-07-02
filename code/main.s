@@ -71,20 +71,25 @@ main:
 	call usart_disable_interupts
 	
 	; set TWI control register to start mode
-	call twi_init_twcr
+;	call twi_init_twcr
 	
 	; set bit rate prescaler for atmega328p
-	ldi r24, BMP085_BITRATE_PRESCALER
-	call twi_set_twbr_atmega328p_prescaler
+;	ldi r24, BMP085_BITRATE_PRESCALER
+;	call twi_set_twbr_atmega328p_prescaler
+	
+	call watchdog_init_interrupt_mode
+	
+	;lds r24, WDTCSR
+	;call send_to_usart
 	
 	sei							; enable global interupts and reset TWCR register
 	
 begin_transmission:
 	
-	call twi_send_start_condition
+;	call twi_send_start_condition
 	
-	ldi r24, BMP085_MODULE_ADDR_W				; pass BMP085 module address as parameter
-	call twi_send_address
+;	ldi r24, BMP085_MODULE_ADDR_W				; pass BMP085 module address as parameter
+;	call twi_send_address
 	
 	; Check value of TWI Status Register. Mask prescaler bits. If status different from MT_SLA_ACK go to ERROR
 ;	call twi_get_status
@@ -102,8 +107,8 @@ begin_transmission:
 	
 	;call twi_send_stop_condition
 	
-	call twi_get_status
-	call send_to_usart
+	;call twi_get_status
+	;call send_to_usart
 	
 sleep_loop:	
 	sleep
@@ -138,6 +143,8 @@ exit_twi_interrupt:
 	
 ; watchdog timeout interrupt
 watchdog_timeout_iterrupt:
+	call flash_led
+	call watchdog_interrupt_disable
 	reti
 	
 .section data
