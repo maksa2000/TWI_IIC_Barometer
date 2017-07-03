@@ -70,23 +70,11 @@ main:
 	call usart_init_rx_tx
 	call usart_disable_interupts
 	
-	; set TWI control register to start mode
-;	call twi_init_twcr
-	
-	; set bit rate prescaler for atmega328p
-;	ldi r24, BMP085_BITRATE_PRESCALER
-;	call twi_set_twbr_atmega328p_prescaler
-	
 	call watchdog_init_interrupt_mode
-	
-	;lds r24, WDTCSR
-	;call send_to_usart
 	
 	sei							; enable global interupts and reset TWCR register
 	
 begin_transmission:
-	
-;	call twi_send_start_condition
 	
 ;	ldi r24, BMP085_MODULE_ADDR_W				; pass BMP085 module address as parameter
 ;	call twi_send_address
@@ -111,6 +99,9 @@ begin_transmission:
 	;call send_to_usart
 	
 sleep_loop:	
+	lds r16, SREG
+	sbrs r16, 0x07		; skip next instruction if global interupt enable bit is set
+	sei
 	sleep
 	rjmp sleep_loop
 	ret
@@ -132,19 +123,46 @@ return_from_interrupt:
 	
 twi_interrupt:
 	push r16
+	
+	; load to r16 value from address in X register
+	ld r16, X
+	adiw r26, 0x01		; increment X register by 1
 	; check TWI status
 	call twi_get_status
-	; if A START condition has been transmitted (0x08 status code)
-	cpi r24, TWI_START_CONDITION
-	brne sleep_loop
+	cp r24, r16
+	
+	;brne sleep_loop
+	
+	;call send_to_usart
 exit_twi_interrupt:
 	pop r16
 	reti
 	
 ; watchdog timeout interrupt
 watchdog_timeout_iterrupt:
-	call flash_led
+	push r24
+	
+	;call flash_led
 	call watchdog_interrupt_disable
+	
+	; set indirect address to begining of twi_mt_states
+	; clear X register HIGH and LOW byte
+	clr r27	
+	clr r26
+	; load twi_mt_states address to X register (address is 16 bit value)
+	ldi r26, lo8(twi_mt_states)
+	ldi r27, hi8(twi_mt_states)
+	
+	; set TWI control register to start mode
+	call twi_init_twcr
+	
+	; set bit rate prescaler for atmega328p
+	ldi r24, BMP085_BITRATE_PRESCALER
+	call twi_set_twbr_atmega328p_prescaler
+	
+	call twi_send_start_condition
+	
+	pop r24
 	reti
 	
 .section data
@@ -154,6 +172,8 @@ twi_data_value:
 .byte 0
 twi_current_state:
 .byte 0
+twi_next_state:
+.byte TWI_START_CONDITION
 
 twi_mt_states:					; master transmis states
 twi_mt_start:
