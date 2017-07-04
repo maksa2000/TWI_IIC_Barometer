@@ -58,7 +58,7 @@ jmp return_from_interrupt					; 0x0032
 .endif
 
 .equ READ_CALIBRATION_ACTION, 0x01
-.equ END_OF_TRANSMISSION, 0xFF
+.equ END_OF_TRANSMISSION, 0x02
 
 main:
 	; set debuging led for blinking
@@ -125,19 +125,13 @@ reset_actions_and_states:
 	push r28
 	push r29
 	
-	; store pointer to current action to current action variable
-	; get address of twi_current_action variable (memory)
-	ldi r26, lo8(twi_current_action)
-	ldi r27, hi8(twi_current_action)
-	; get starting address of actions queue (pointer)
-	ldi r28, lo8(twi_actions_queue)
-	ldi r29, hi8(twi_actions_queue)
-	call store_pointer_to_mem
-	; store pointer to next action into next action variable
-	ldi r26, lo8(twi_next_action)
-	ldi r27, hi8(twi_next_action)
-	adiw r28, 0x01					; move to the next element of actions queue
-	call store_pointer_to_mem
+	; set current action
+	ldi r26, 0x00
+	sts twi_current_action, r26
+	
+	; set next action
+	inc r26
+	sts twi_next_action, r26
 	
 	; store pointer to next state to next state variable
 	ldi r26, lo8(twi_next_state)
@@ -237,10 +231,10 @@ twi_current_state:					; holds pointer to the current state in state queue
 .word 0
 twi_next_state:						; holds pointer to the next state in state queue
 .word 0
-twi_current_action:					; holds pointer to current action in actions queue				
-.word 0
+twi_current_action:					; to void ponter movement complexity actions would be just byte and every next action is previous_action + 1		
+.byte 0
 twi_next_action:					; holds pointer to next action in actions queue
-.word 0
+.byte 0
 
 twi_actions_queue:
 .byte READ_CALIBRATION_ACTION
