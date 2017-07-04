@@ -35,7 +35,7 @@ twi_init_twcr:
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC5 is disconnected from the port and becomes the Serial Clock I/O pin for the 2-wire Serial Interface.
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC4 is disconnected from the port and becomes the Serial Data I/O pin for the 2-wire Serial Interface.
 	push r16
-	ldi r16, 0x05		; 0000 0101b
+	ldi r16, 0x45		; 0100 0101b
 	sts TWCR, r16
 	
 	call twi_clear_twsr_prescaler	

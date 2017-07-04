@@ -57,6 +57,9 @@ jmp return_from_interrupt					; 0x0032
 .include "atmega328p_core/watchdog.inc"
 .endif
 
+.equ READ_CALIBRATION_ACTION, 0x01
+.equ END_OF_TRANSMISSION, 0xFF
+
 main:
 	; set debuging led for blinking
 	call init_led
@@ -99,11 +102,65 @@ begin_transmission:
 	;call send_to_usart
 	
 sleep_loop:	
+	call reset_actions_and_states
 	lds r16, SREG
 	sbrs r16, 0x07		; skip next instruction if global interupt enable bit is set
 	sei
 	sleep
 	rjmp sleep_loop
+	ret
+	
+; reads calibration values from BMP085 sersor EEPROM
+read_bmp085_calibrations:
+	; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
+	call twi_send_start_condition
+	
+	
+	ret
+	
+; resets actions and states variables values
+reset_actions_and_states:
+	push r26
+	push r27
+	push r28
+	push r29
+	
+	; store pointer to current action to current action variable
+	; get address of twi_current_action variable (memory)
+	ldi r26, lo8(twi_current_action)
+	ldi r27, hi8(twi_current_action)
+	; get starting address of actions queue (pointer)
+	ldi r28, lo8(twi_actions_queue)
+	ldi r29, hi8(twi_actions_queue)
+	call store_pointer_to_mem
+	; store pointer to next action into next action variable
+	ldi r26, lo8(twi_next_action)
+	ldi r27, hi8(twi_next_action)
+	adiw r28, 0x01					; move to the next element of actions queue
+	call store_pointer_to_mem
+	
+	; store pointer to next state to next state variable
+	ldi r26, lo8(twi_next_state)
+	ldi r27, hi8(twi_next_state)
+	; load pointer to the next state from state queue to Y register
+	ldi r28, lo8(twi_mt_states_queue)
+	ldi r29, hi8(twi_mt_states_queue)
+	call store_pointer_to_mem
+
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	ret
+	
+; store memory pointer to memory location
+; memory location (destination) must be set in X register
+; pointer to store (source), must be set in Y register
+; function does not return any value
+store_pointer_to_mem:
+	st X, r28
+	adiw r26, 0x01		; move to high byte
+	st X, r29
 	ret
 	
 ; send twi status to usrt
@@ -125,13 +182,11 @@ twi_interrupt:
 	push r16
 	
 	; load to r16 value from address in X register
-	ld r16, X
-	adiw r26, 0x01		; increment X register by 1
+	;ld r16, X
+	;adiw r26, 0x01		; increment X register by 1
 	; check TWI status
-	call twi_get_status
-	cp r24, r16
-	
-	;brne sleep_loop
+	;call twi_get_status
+	;cp r24, r16
 	
 	;call send_to_usart
 exit_twi_interrupt:
@@ -142,73 +197,109 @@ exit_twi_interrupt:
 watchdog_timeout_iterrupt:
 	push r24
 	
-	;call flash_led
 	call watchdog_interrupt_disable
 	
-	; set indirect address to begining of twi_mt_states
+	; set indirect address for actions queue
 	; clear X register HIGH and LOW byte
 	clr r27	
 	clr r26
+	
 	; load twi_mt_states address to X register (address is 16 bit value)
-	ldi r26, lo8(twi_mt_states)
-	ldi r27, hi8(twi_mt_states)
+	;ldi r26, lo8(twi_mt_states)
+	;ldi r27, hi8(twi_mt_states)
+	
+	;lds r24, twi_next_action			; get next action from variable
+	;sts twi_current_action, r24			; save next action to current action
+	
+	;call flash_led
+	
+	
+	
 	
 	; set TWI control register to start mode
-	call twi_init_twcr
+	;call twi_init_twcr
 	
 	; set bit rate prescaler for atmega328p
-	ldi r24, BMP085_BITRATE_PRESCALER
-	call twi_set_twbr_atmega328p_prescaler
+	;ldi r24, BMP085_BITRATE_PRESCALER
+	;call twi_set_twbr_atmega328p_prescaler
 	
-	call twi_send_start_condition
-	
+	;call twi_send_start_condition
+watchdog_timeout_iterrupt_exit:
 	pop r24
 	reti
 	
 .section data
-timer0_overflow_interrupt_cnt:
-.byte 0
-twi_data_value:
-.byte 0
-twi_current_state:
-.byte 0
-twi_next_state:
-.byte TWI_START_CONDITION
+;timer0_overflow_interrupt_cnt:
+;.byte 0
+;twi_data_value:
+;.byte 0
+twi_current_state:					; holds pointer to the current state in state queue
+.word 0
+twi_next_state:						; holds pointer to the next state in state queue
+.word 0
+twi_current_action:					; holds pointer to current action in actions queue				
+.word 0
+twi_next_action:					; holds pointer to next action in actions queue
+.word 0
 
-twi_mt_states:					; master transmis states
-twi_mt_start:
+twi_actions_queue:
+.byte READ_CALIBRATION_ACTION
+.byte END_OF_TRANSMISSION
+
+
+twi_mt_states_queue:				; master transmis states
 .byte TWI_START_CONDITION
-twi_mt_rstart:
-.byte TWI_RSTART_CONDITION
-twi_mt_mt_sla_w_ack:			; master transmit slave address write acknowlengement recieved
-.byte TWI_MT_SLA_W_ACK
-twi_mt_sla_data_w_ack:				; master transmit slave address write not acknowlengement recieved
-.byte TWI_MT_DATA_W_ACK
-twi_no_mt_state_info:
+.byte TWI_RSTART_CONDITION			
+.byte TWI_MT_SLA_W_ACK				; master transmit slave address write acknowlengement recieved			
+.byte TWI_MT_DATA_W_ACK				; master transmit slave address write not acknowlengement recieved
 .byte TWI_NO_STATE_INFO
-twi_bus_mt_err:
 .byte TWI_BUS_ERR
-twi_mt_sla_w_nack:
 .byte TWI_MT_SLA_W_NACK
-twi_mt_data_w_nack:
 .byte TWI_MT_DATA_W_NACK
 
-twi_mr_states:					; master recieve states
-twi_mr_start:
+twi_mr_states_queue:			; master recieve states
 .byte TWI_START_CONDITION
-twi_mr_rstart:
-.byte TWI_RSTART_CONDITION
-twi_mr_mr_sla_r_ack:			; master recieve slave address read acknowledgement recieved
-.byte TWI_MR_SLA_R_ACK
-twi_mr_data_r_ack:				; master recieve slave address read not acknowledgement recieved
-.byte TWI_MR_DATA_R_ACK
-twi_no_mr_state_info:
+.byte TWI_RSTART_CONDITION			
+.byte TWI_MR_SLA_R_ACK			; master recieve slave address read acknowledgement recieved			
+.byte TWI_MR_DATA_R_ACK			; master recieve slave address read not acknowledgement recieved
 .byte TWI_NO_STATE_INFO
-twi_bus_mr_err:
 .byte TWI_BUS_ERR
-twi_mr_sla_r_nack:
 .byte TWI_MR_SLA_R_NACK
-twi_mr_data_r_nack:
 .byte TWI_MR_DATA_R_NACK
+
+; colibration data values
+bmp085_ac1_val:
+.byte 0
+.byte 0
+bmp085_ac2_val:
+.byte 0
+.byte 0
+bmp085_ac3_val:
+.byte 0
+.byte 0
+bmp085_ac4_val:
+.byte 0
+.byte 0
+bmp085_ac5_val:
+.byte 0
+.byte 0
+bmp085_ac6_val:
+.byte 0
+.byte 0
+bmp085_b1_val:
+.byte 0
+.byte 0
+bmp085_b2_val:
+.byte 0
+.byte 0
+bmp085_mb_val:
+.byte 0
+.byte 0
+bmp085_mc_val:
+.byte 0
+.byte 0
+bmp085_md_val:
+.byte 0
+.byte 0
 
 .end

@@ -13,6 +13,30 @@ BMP_085_MODULE = 0
 .equ BMP085_PRES_REG3_ADDR, 0xF4
 .equ BMP085_BITRATE_PRESCALER, 0x48
 
+; Calibration coefficients registers
+.equ BMP085_AC1_MSB, 0xAA
+.equ BMP085_AC1_LSB, 0xAB
+.equ BMP085_AC2_MSB, 0xAC
+.equ BMP085_AC2_LSB, 0xAD
+.equ BMP085_AC3_MSB, 0xAE
+.equ BMP085_AC3_LSB, 0xAF
+.equ BMP085_AC4_MSB, 0xB0
+.equ BMP085_AC4_LSB, 0xB1
+.equ BMP085_AC5_MSB, 0xB2
+.equ BMP085_AC5_LSB, 0xB3
+.equ BMP085_AC6_MSB, 0xB4
+.equ BMP085_AC6_LSB, 0xB5
+.equ BMP085_B1_MSB, 0xB6
+.equ BMP085_B1_LSB, 0xB7
+.equ BMP085_B2_MSB, 0xB8
+.equ BMP085_B2_LSB, 0xB9
+.equ BMP085_MB_MSB, 0xBA
+.equ BMP085_MB_LSB, 0xBB
+.equ BMP085_MC_MSB, 0xBC
+.equ BMP085_MC_LSB, 0xBD
+.equ BMP085_MD_MSB, 0xBE
+.equ BMP085_MD_LSB, 0xBF
+
 .global bmp_085_get_temperature
 
 bmp_085_get_temperature:
