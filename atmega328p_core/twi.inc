@@ -35,7 +35,7 @@ twi_init_twcr:
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC5 is disconnected from the port and becomes the Serial Clock I/O pin for the 2-wire Serial Interface.
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC4 is disconnected from the port and becomes the Serial Data I/O pin for the 2-wire Serial Interface.
 	push r16
-	ldi r16, 0x45		; 0100 0101b
+	ldi r16, 0x44		; 0100 0100b
 	sts TWCR, r16
 	
 	call twi_clear_twsr_prescaler	
@@ -48,17 +48,12 @@ twi_init_twcr:
 ; function does not take nor recieve parameters
 twi_send_start_condition:
 	push r16
-	lds r16, TWCR
 	
+	call twi_interrupt_enable
+	lds r16, TWCR
 	; set START condition bit
 	ori r16, 0x20					; 0010 0000b
-	sts TWCR, r16
-	
-; TODO: do this inside interrupt
-twi_send_start_condition_wait:
-	lds r16, TWCR
-	sbrs r16, TWINT_BIT			; TWINT flag bit
-	rjmp twi_send_start_condition_wait	
+	sts TWCR, r16	
 	pop r16
 	ret
 
@@ -200,8 +195,21 @@ twi_clear_twsr_prescaler:
 	pop r16
 	ret
 	
-twi_error_handler:
+; enables twi interrupt
+twi_interrupt_enable:
 	push r16
+	lds r16, TWCR
+	ori r16, 0x01		; 0000 0001b
+	sts TWCR, r16
+	pop r16
+	ret
+	
+; disables twi interrupt
+twi_interrupt_disable:
+	push r16
+	lds r16, TWCR
+	andi r16, 0xFE		; 1111 1110b
+	sts TWCR, r16
 	pop r16
 	ret
 	

@@ -19,6 +19,17 @@ watchdog_init_interrupt_mode:
 	pop r16
 	ret
 	
+; initialize watchdog for reset mode
+; function does not take nor recieve parameters
+watchdog_init_reset_mode:
+	push r16
+	ldi r16, 0x58			; 0111 0000b
+	sts WDTCSR, r16
+	ldi r16, 0x08			; 0000 1000b	system reset with 16ms delay
+	sts WDTCSR, r16
+	pop r16
+	ret
+	
 watchdog_interrupt_disable:
 	push r16
 	lds r16, WDTCSR

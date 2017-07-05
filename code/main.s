@@ -58,7 +58,8 @@ jmp return_from_interrupt					; 0x0032
 .endif
 
 .equ READ_CALIBRATION_ACTION, 0x01
-.equ END_OF_TRANSMISSION, 0x02
+.equ READ_DATA_ACTION, 0x02
+.equ WRITE_DATA_ACTION, 0x03
 
 main:
 	; set debuging led for blinking
@@ -73,9 +74,20 @@ main:
 	call usart_init_rx_tx
 	call usart_disable_interupts
 	
-	call watchdog_init_interrupt_mode
+	; set TWI control register to start mode
+	call twi_init_twcr
 	
-	sei							; enable global interupts and reset TWCR register
+	; set bit rate prescaler for atmega328p
+	ldi r24, BMP085_BITRATE_PRESCALER
+	call twi_set_twbr_atmega328p_prescaler
+	
+	;call watchdog_init_interrupt_mode
+	
+	sei							; enable global interupts and reset TWCR registe
+	
+	call reset_actions_and_states
+	;call read_bmp085_calibrations
+	call twi_send_start_condition
 	
 begin_transmission:
 	
@@ -102,20 +114,89 @@ begin_transmission:
 	;call send_to_usart
 	
 sleep_loop:	
-	call reset_actions_and_states
 	lds r16, SREG
 	sbrs r16, 0x07		; skip next instruction if global interupt enable bit is set
 	sei
 	sleep
+	call reset_actions_and_states
 	rjmp sleep_loop
+	ret
+	
+; reset device
+device_reset:
+	call watchdog_init_reset_mode
+	sleep
+	ret
+	
+; error handler function
+; this function does not take nor recieve parameters
+error_handler:
+	push r16
+	; if action equals read calibrations restart device
+	lds r16, twi_next_action
+	cpi r16, READ_CALIBRATION_ACTION
+	brne error_handler_action_other
+	call device_reset
+error_handler_action_other:
+	; if action not real calibrations, then reset watchdog and exit from function
+	pop r16
 	ret
 	
 ; reads calibration values from BMP085 sersor EEPROM
 read_bmp085_calibrations:
+	push r24
 	; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
 	call twi_send_start_condition
 	
+	call twi_get_status
 	
+	; if status not equal START or RSTART execute error_handler and exit
+	cpi r24, TWI_START_CONDITION
+	breq read_bmp085_calibrations_send_r_address
+	
+	cpi r24, TWI_RSTART_CONDITION
+	breq read_bmp085_calibrations_send_r_address
+	
+	call error_handler
+	rjmp read_bmp085_calibrations_exit
+	
+read_bmp085_calibrations_send_r_address:
+	ldi r24, BMP085_MODULE_ADDR_R
+	call twi_send_address
+	
+	call twi_get_status
+	
+	cpi r24, TWI_MR_SLA_R_ACK
+	breq read_bmp085_calibrations_send_reg_address
+	
+	call error_handler
+	rjmp read_bmp085_calibrations_exit
+
+read_bmp085_calibrations_send_reg_address:
+	ldi r24, BMP085_AC1_MSB
+	call twi_send_data
+	
+	call twi_get_status
+	
+	; debug -->
+	;push r16
+	;mov r16, r24
+	;call send_to_usart
+	;pop r16
+	;mov r24, r16
+	; debug <--
+	
+	cpi r24, TWI_MR_DATA_R_ACK
+	breq read_bmp085_calibrations_send_stop
+	
+	call error_handler
+	rjmp read_bmp085_calibrations_exit
+	
+read_bmp085_calibrations_send_stop:
+	call twi_send_stop_condition	
+	
+read_bmp085_calibrations_exit:	
+	pop r24
 	ret
 	
 ; resets actions and states variables values
@@ -147,6 +228,33 @@ reset_actions_and_states:
 	pop r26
 	ret
 	
+process_twi_status:
+	push r16
+	push r17
+	
+	lds r16, twi_current_state
+	lds r17, twi_current_action
+
+	cpi r17, READ_CALIBRATION_ACTION
+	breq process_twi_status_read_data
+	
+	cpi r17, READ_DATA_ACTION
+	breq process_twi_status_read_data
+	
+	cpi r17, WRITE_DATA_ACTION
+	breq process_twi_status_write_data
+
+process_twi_status_read_data:
+	rjmp process_twi_status_exit
+	
+process_twi_status_write_data:
+	rjmp process_twi_status_exit
+	
+process_twi_status_exit:
+	pop r17
+	pop r16
+	ret
+	
 ; store memory pointer to memory location
 ; memory location (destination) must be set in X register
 ; pointer to store (source), must be set in Y register
@@ -174,16 +282,21 @@ return_from_interrupt:
 	
 twi_interrupt:
 	push r16
+	call twi_get_status
 	
-	; load to r16 value from address in X register
-	;ld r16, X
-	;adiw r26, 0x01		; increment X register by 1
-	; check TWI status
-	;call twi_get_status
-	;cp r24, r16
+	sts twi_current_state, r24
 	
-	;call send_to_usart
+	; debug -->
+	push r16
+	mov r16, r24
+	call send_to_usart
+	pop r16
+	mov r24, r16
+	; debug <--
+	
 exit_twi_interrupt:
+	call twi_interrupt_disable
+	;call twi_twint_clear
 	pop r16
 	reti
 	
@@ -207,16 +320,6 @@ watchdog_timeout_iterrupt:
 	
 	;call flash_led
 	
-	
-	
-	
-	; set TWI control register to start mode
-	;call twi_init_twcr
-	
-	; set bit rate prescaler for atmega328p
-	;ldi r24, BMP085_BITRATE_PRESCALER
-	;call twi_set_twbr_atmega328p_prescaler
-	
 	;call twi_send_start_condition
 watchdog_timeout_iterrupt_exit:
 	pop r24
@@ -227,19 +330,14 @@ watchdog_timeout_iterrupt_exit:
 ;.byte 0
 ;twi_data_value:
 ;.byte 0
-twi_current_state:					; holds pointer to the current state in state queue
-.word 0
 twi_next_state:						; holds pointer to the next state in state queue
 .word 0
 twi_current_action:					; to void ponter movement complexity actions would be just byte and every next action is previous_action + 1		
 .byte 0
 twi_next_action:					; holds pointer to next action in actions queue
 .byte 0
-
-twi_actions_queue:
-.byte READ_CALIBRATION_ACTION
-.byte END_OF_TRANSMISSION
-
+twi_current_state:
+.byte 0
 
 twi_mt_states_queue:				; master transmis states
 .byte TWI_START_CONDITION
