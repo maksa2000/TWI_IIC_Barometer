@@ -4,6 +4,11 @@ BMP_085_MODULE = 0
 .include "atmega328p_core/twi.inc"
 .endif
 
+.ifndef WATCHDOG
+.include "atmega328p_core/watchdog.inc"
+.endif
+
+.text 0
 .equ BMP085_MODULE_ADDR_W, 0xEE
 .equ BMP085_MODULE_ADDR_R, 0xEF
 .equ BMP085_TEMP_REG_ADDR, 0x2E
@@ -37,7 +42,303 @@ BMP_085_MODULE = 0
 .equ BMP085_MD_MSB, 0xBE
 .equ BMP085_MD_LSB, 0xBF
 
+; those functions expect that twi interrupt is enabled
 .global bmp_085_get_temperature
+.global bmp_085_read_calibrations
+.global bmp_085_reset_actions_and_states
+
+; initialize interfaces and internal variables for bmp085
+; function does not take nor recieve parameters
+bmp_085_init:
+	push r24
+	; set TWI control register to start mode
+	call twi_init_twcr
+	
+	; set bit rate prescaler for atmega328p
+	ldi r24, BMP085_BITRATE_PRESCALER
+	call twi_set_twbr_atmega328p_prescaler
+	
+	call bmp_085_reset_actions_and_states
+	
+	pop r24
+	ret
+
+; reads calibration values from BMP085 sersor EEPROM
+; function recieve through r24 and r25 registers what calibration it should read
+; r24 - calibration LSB address
+; r25 - calibration MSB address
+bmp_085_read_calibrations:
+	; save current state of Z register (will use Z register as base pointer)
+	push r30
+	push r31
+	; move current stack pointer position to Z register
+	in r30, SPL
+	in r31, SPH
+	; save recieved values to stack
+	push r24	;- LSB
+	push r25	;- MSB
+	push r16	;- temporary register
+	; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
+	call twi_send_start_condition
+	
+	call twi_get_status
+	
+	; if status not equal START or RSTART execute error_handler and exit
+	cpi r24, TWI_START_CONDITION
+	breq _bmp_085_read_calibrations_send_r_address
+	
+	cpi r24, TWI_RSTART_CONDITION
+	breq _bmp_085_read_calibrations_send_r_address
+	
+	call bmp_085_error_handler
+	rjmp _bmp_085_read_calibrations_exit
+	
+_bmp_085_read_calibrations_send_r_address:
+	ldi r24, BMP085_MODULE_ADDR_R
+	call twi_send_address
+	
+	call twi_get_status
+	
+	cpi r24, TWI_MR_SLA_R_ACK
+	breq _bmp_085_read_calibrations_send_reg_address
+	
+	call bmp_085_error_handler
+	rjmp _bmp_085_read_calibrations_exit
+
+_bmp_085_read_calibrations_send_reg_address:
+	; save base pointer to X register
+	movw r24, r30
+	; load calibration LSB from stack
+	ld r16, X
+	
+	mov r24, r16
+	call twi_send_data
+	
+	; save base pointer to X register
+	movw r24, r30
+	; load calibration MSB from stack
+	adiw r24, 0x01		; move to the next address
+	ld r16, X
+	
+	mov r24, r16
+	call twi_send_data
+	
+	call twi_get_status
+	
+	; debug -->
+	;push r16
+	;mov r16, r24
+	;call send_to_usart
+	;pop r16
+	;mov r24, r16
+	; debug <--
+	
+	cpi r24, TWI_MR_DATA_R_ACK
+	breq _bmp_085_read_calibrations_send_stop
+	
+	call bmp_085_error_handler
+	rjmp _bmp_085_read_calibrations_exit
+	
+_bmp_085_read_calibrations_send_stop:
+	call twi_send_stop_condition	
+	
+_bmp_085_read_calibrations_exit:
+	pop r16
+	pop r25
+	pop r24
+	pop r31
+	pop r30
+	ret
+	
+; resets actions and states variables values
+bmp_085_reset_actions_and_states:
+	push r26
+	push r27
+	push r28
+	push r29
+	
+	; set current action
+	ldi r26, 0x00
+	sts twi_current_action, r26
+	
+	; set next action
+	inc r26
+	sts twi_next_action, r26
+	
+	; store pointer to next state to next state variable
+	ldi r26, lo8(twi_next_state)
+	ldi r27, hi8(twi_next_state)
+	; load pointer to the next state from state queue to Y register
+	ldi r28, lo8(twi_mt_states_queue)
+	ldi r29, hi8(twi_mt_states_queue)
+	call bmp_085_store_pointer_to_mem
+
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	ret
+	
+; this function should be executed to process different twi statuses
+bmp_085_process_twi_status:
+	push r16
+	push r17
+	
+	lds r16, twi_current_state
+	lds r17, twi_current_action
+
+	cpi r17, READ_CALIBRATION_ACTION
+	breq _bmp_085_process_twi_status_read_data
+	
+	cpi r17, READ_DATA_ACTION
+	breq _bmp_085_process_twi_status_read_data
+	
+	cpi r17, WRITE_DATA_ACTION
+	breq _bmp_085_process_twi_status_write_data
+
+_bmp_085_process_twi_status_read_data:
+	rjmp _bmp_085_process_twi_status_exit
+	
+_bmp_085_process_twi_status_write_data:
+	rjmp _bmp_085_process_twi_status_exit
+	
+_bmp_085_process_twi_status_exit:
+	pop r17
+	pop r16
+	ret
+	
+; error handler function
+; this function does not take nor recieve parameters
+bmp_085_error_handler:
+	push r16
+	; if action equals read calibrations restart device
+	lds r16, twi_next_action
+	cpi r16, READ_CALIBRATION_ACTION
+	brne _bmp_085_error_handler_other
+	call bmp_085_device_reset
+_bmp_085_error_handler_other:
+	; if action not real calibrations, then reset watchdog and exit from function
+	pop r16
+	ret
+	
+; reset device
+bmp_085_device_reset:
+	call watchdog_init_reset_mode
+	sleep
+	ret	
+	
+; store memory pointer to memory location
+; memory location (destination) must be set in X register
+; pointer to store (source), must be set in Y register
+; function does not return any value
+bmp_085_store_pointer_to_mem:
+	st X, r28
+	adiw r26, 0x01		; move to high byte
+	st X, r29
+	ret
 
 bmp_085_get_temperature:
 	ret
+	
+bmp_085_twi_interrupt:
+	push r16
+	call twi_get_status
+	
+	sts twi_current_state, r24
+	
+	; debug -->
+	push r16
+	mov r16, r24
+	call send_to_usart
+	pop r16
+	mov r24, r16
+	; debug <--
+	
+_bmp_085_twi_interrupt_exit:
+	call twi_interrupt_disable
+	;call twi_twint_clear
+	pop r16
+	reti
+	
+; watchdog timeout interrupt
+bmp_085_watchdog_timeout_iterrupt:
+	push r24
+	
+	call watchdog_interrupt_disable
+	
+	; set indirect address for actions queue
+	; clear X register HIGH and LOW byte
+	clr r27	
+	clr r26
+	
+	lds r24, twi_next_action			; get next action from variable
+	sts twi_current_action, r24			; save next action to current action
+	
+_bmp_085_watchdog_timeout_iterrupt_exit:
+	pop r24
+	reti
+	
+.data 0
+twi_next_state:						; holds pointer to the next state in state queue
+.word 0
+twi_current_action:					; to void ponter movement complexity actions would be just byte and every next action is previous_action + 1		
+.byte 0
+twi_next_action:					; holds pointer to next action in actions queue
+.byte 0
+twi_current_state:
+.byte 0
+
+twi_mt_states_queue:				; master transmis states
+.byte TWI_START_CONDITION
+.byte TWI_RSTART_CONDITION			
+.byte TWI_MT_SLA_W_ACK				; master transmit slave address write acknowlengement recieved			
+.byte TWI_MT_DATA_W_ACK				; master transmit slave address write not acknowlengement recieved
+.byte TWI_NO_STATE_INFO
+.byte TWI_BUS_ERR
+.byte TWI_MT_SLA_W_NACK
+.byte TWI_MT_DATA_W_NACK
+
+twi_mr_states_queue:			; master recieve states
+.byte TWI_START_CONDITION
+.byte TWI_RSTART_CONDITION			
+.byte TWI_MR_SLA_R_ACK			; master recieve slave address read acknowledgement recieved			
+.byte TWI_MR_DATA_R_ACK			; master recieve slave address read not acknowledgement recieved
+.byte TWI_NO_STATE_INFO
+.byte TWI_BUS_ERR
+.byte TWI_MR_SLA_R_NACK
+.byte TWI_MR_DATA_R_NACK
+
+; colibration data values
+bmp085_ac1_val:
+.byte 0
+.byte 0
+bmp085_ac2_val:
+.byte 0
+.byte 0
+bmp085_ac3_val:
+.byte 0
+.byte 0
+bmp085_ac4_val:
+.byte 0
+.byte 0
+bmp085_ac5_val:
+.byte 0
+.byte 0
+bmp085_ac6_val:
+.byte 0
+.byte 0
+bmp085_b1_val:
+.byte 0
+.byte 0
+bmp085_b2_val:
+.byte 0
+.byte 0
+bmp085_mb_val:
+.byte 0
+.byte 0
+bmp085_mc_val:
+.byte 0
+.byte 0
+bmp085_md_val:
+.byte 0
+.byte 0

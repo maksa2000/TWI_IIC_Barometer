@@ -39,3 +39,6 @@ ATMEGA328P_REGISTER_CODES = 0 	; define ATMEGA328P_REGISTER_CODES
 ; watchdog registers
 .equ MCUSR, 0x34			; MCU status register I/O port address
 .equ WDTCSR, 0x60			; Watchdog Timer Control Register
+; stack pointer registers
+.equ SPH, 0x3E				; Stack Pointer High byte (I/O port address)
+.equ SPL, 0x3D				; Stack Pointer Low byte (I/O post address)

@@ -46,67 +46,67 @@ r16_value2str:
 	; next code comparing r16 with hex values and if values are equal move ascii code from r17 to r16 and exit
 	ldi r17, 0x30					; move to r17 appropriate ascii code
 	cpi r16, 0x00					; compare r16 with 0
-	breq r16_value2str_exit			; if equal, than move value from r17 to r16 and exit	
+	breq _r16_value2str_exit			; if equal, than move value from r17 to r16 and exit	
 	
 	ldi r17, 0x31
 	cpi r16, 0x01
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x32
 	cpi r16, 0x02
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x33
 	cpi r16, 0x03
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x34
 	cpi r16, 0x04
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x35
 	cpi r16, 0x05
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x36
 	cpi r16, 0x06
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x37
 	cpi r16, 0x07
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x38
 	cpi r16, 0x08
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x39
 	cpi r16, 0x09
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x41
 	cpi r16, 0x0A
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x42
 	cpi r16, 0x0B
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x43
 	cpi r16, 0x0C
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x44
 	cpi r16, 0x0D
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x45
 	cpi r16, 0x0E
-	breq r16_value2str_exit
+	breq _r16_value2str_exit
 	
 	ldi r17, 0x46
 	
-r16_value2str_exit:
+_r16_value2str_exit:
 	mov r16, r17		; move ascii code from r17 to r16
 	pop r17
 	ret

@@ -26,10 +26,10 @@ timer0_set_ov_interrupt:
 	ldi r16, 0x00
 	cpi r24, 0x00
 	; if r24 equal 0x00, store 0x00 from r16 to TIMSK0 register
-	breq timer0_set_ov_interrupt_exit
+	breq _timer0_set_ov_interrupt_exit
 	; if not equal, set r16 to 0x01 and store this value to TIMSK0 register
 	ldi r16, 0x01
-timer0_set_ov_interrupt_exit:
+_timer0_set_ov_interrupt_exit:
 	sts TIMSK0, r16
 	pop r16
 	ret

@@ -66,10 +66,10 @@ twi_send_stop_condition:
 	ori r16, 0x10					; 0001 0000b
 	; clear TWINT bit
 	call twi_twint_clear ;do I need to clear it?
-twi_send_stop_condition_wait:
+_twi_send_stop_condition_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT			; TWINT flag bit
-	rjmp twi_send_stop_condition_wait	
+	rjmp _twi_send_stop_condition_wait	
 	pop r16
 	ret
 	
@@ -121,9 +121,9 @@ twi_set_read_write_mode:
 	mov r16, r24
 	cbr r16, 1			; clear 0 bit in r16 register
 	cpi r24, 0x00
-	breq exit_twi_set_save_device_mode
+	breq _exit_twi_set_save_device_mode
 	sbr r16, 1			; set first bit in r16
-exit_twi_set_save_device_mode:
+_exit_twi_set_save_device_mode:
 	mov r24, r16
 	pop r16
 	ret
@@ -135,10 +135,10 @@ twi_send_address:
 	push r16	
 	sts TWDR, r24
 	call twi_clear_start_condition	; clearing START condition will also clear TWINT bit
-twi_send_address_wait:
+_twi_send_address_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT
-	rjmp twi_send_address_wait
+	rjmp _twi_send_address_wait
 	pop r16
 	ret
 	

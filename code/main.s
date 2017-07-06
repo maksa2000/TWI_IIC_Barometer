@@ -1,5 +1,6 @@
 ; interrupt vector table
 ; NB! Better allways create whole vector table
+.text 0
 .org 0x0000
 jmp main									; reset vector
 jmp return_from_interrupt					; 0x0002
@@ -7,7 +8,7 @@ jmp return_from_interrupt					; 0x0004
 jmp return_from_interrupt					; 0x0006
 jmp return_from_interrupt					; 0x0008
 jmp return_from_interrupt					; 0x000A
-jmp watchdog_timeout_iterrupt				; 0x000C		watchdog timeout interrupt
+jmp bmp_085_watchdog_timeout_iterrupt		; 0x000C		watchdog timeout interrupt
 jmp return_from_interrupt					; 0x000E
 jmp return_from_interrupt					; 0x0010
 jmp return_from_interrupt					; 0x0012
@@ -25,7 +26,7 @@ jmp return_from_interrupt					; 0x0028
 jmp return_from_interrupt					; 0x002A
 jmp return_from_interrupt					; 0x002C
 jmp return_from_interrupt					; 0x002E
-jmp twi_interrupt							; 0x0030
+jmp bmp_085_twi_interrupt					; 0x0030
 jmp return_from_interrupt					; 0x0032
 
 ; function includes should be allways after interrupt vector table
@@ -61,6 +62,7 @@ jmp return_from_interrupt					; 0x0032
 .equ READ_DATA_ACTION, 0x02
 .equ WRITE_DATA_ACTION, 0x03
 
+.balign 2	; this will align main function to even byte (otherwise code is not executable)
 main:
 	; set debuging led for blinking
 	call init_led
@@ -74,195 +76,23 @@ main:
 	call usart_init_rx_tx
 	call usart_disable_interupts
 	
-	; set TWI control register to start mode
-	call twi_init_twcr
-	
-	; set bit rate prescaler for atmega328p
-	ldi r24, BMP085_BITRATE_PRESCALER
-	call twi_set_twbr_atmega328p_prescaler
+	; initialize interfaces and internal variables for bmp085 
+	call bmp_085_init
 	
 	;call watchdog_init_interrupt_mode
 	
 	sei							; enable global interupts and reset TWCR registe
+
 	
-	call reset_actions_and_states
-	;call read_bmp085_calibrations
-	call twi_send_start_condition
+	call bmp_085_read_calibrations	
 	
-begin_transmission:
-	
-;	ldi r24, BMP085_MODULE_ADDR_W				; pass BMP085 module address as parameter
-;	call twi_send_address
-	
-	; Check value of TWI Status Register. Mask prescaler bits. If status different from MT_SLA_ACK go to ERROR
-;	call twi_get_status
-;	cpi r24, 0x48
-;	brne continue
-;	call twi_send_stop_condition
-;	rjmp begin_transmission
-;continue:
-	; send device address
-	;ldi r24, BMP085_TEMP_REG_ADDR
-	;call twi_send_address
-	; send control register
-	;ldi r24, BMP085_TEMP_REG_ADDR
-	;call twi_send_address
-	
-	;call twi_send_stop_condition
-	
-	;call twi_get_status
-	;call send_to_usart
-	
-sleep_loop:	
+_sleep_loop:	
 	lds r16, SREG
 	sbrs r16, 0x07		; skip next instruction if global interupt enable bit is set
 	sei
 	sleep
-	call reset_actions_and_states
-	rjmp sleep_loop
-	ret
-	
-; reset device
-device_reset:
-	call watchdog_init_reset_mode
-	sleep
-	ret
-	
-; error handler function
-; this function does not take nor recieve parameters
-error_handler:
-	push r16
-	; if action equals read calibrations restart device
-	lds r16, twi_next_action
-	cpi r16, READ_CALIBRATION_ACTION
-	brne error_handler_action_other
-	call device_reset
-error_handler_action_other:
-	; if action not real calibrations, then reset watchdog and exit from function
-	pop r16
-	ret
-	
-; reads calibration values from BMP085 sersor EEPROM
-read_bmp085_calibrations:
-	push r24
-	; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
-	call twi_send_start_condition
-	
-	call twi_get_status
-	
-	; if status not equal START or RSTART execute error_handler and exit
-	cpi r24, TWI_START_CONDITION
-	breq read_bmp085_calibrations_send_r_address
-	
-	cpi r24, TWI_RSTART_CONDITION
-	breq read_bmp085_calibrations_send_r_address
-	
-	call error_handler
-	rjmp read_bmp085_calibrations_exit
-	
-read_bmp085_calibrations_send_r_address:
-	ldi r24, BMP085_MODULE_ADDR_R
-	call twi_send_address
-	
-	call twi_get_status
-	
-	cpi r24, TWI_MR_SLA_R_ACK
-	breq read_bmp085_calibrations_send_reg_address
-	
-	call error_handler
-	rjmp read_bmp085_calibrations_exit
-
-read_bmp085_calibrations_send_reg_address:
-	ldi r24, BMP085_AC1_MSB
-	call twi_send_data
-	
-	call twi_get_status
-	
-	; debug -->
-	;push r16
-	;mov r16, r24
-	;call send_to_usart
-	;pop r16
-	;mov r24, r16
-	; debug <--
-	
-	cpi r24, TWI_MR_DATA_R_ACK
-	breq read_bmp085_calibrations_send_stop
-	
-	call error_handler
-	rjmp read_bmp085_calibrations_exit
-	
-read_bmp085_calibrations_send_stop:
-	call twi_send_stop_condition	
-	
-read_bmp085_calibrations_exit:	
-	pop r24
-	ret
-	
-; resets actions and states variables values
-reset_actions_and_states:
-	push r26
-	push r27
-	push r28
-	push r29
-	
-	; set current action
-	ldi r26, 0x00
-	sts twi_current_action, r26
-	
-	; set next action
-	inc r26
-	sts twi_next_action, r26
-	
-	; store pointer to next state to next state variable
-	ldi r26, lo8(twi_next_state)
-	ldi r27, hi8(twi_next_state)
-	; load pointer to the next state from state queue to Y register
-	ldi r28, lo8(twi_mt_states_queue)
-	ldi r29, hi8(twi_mt_states_queue)
-	call store_pointer_to_mem
-
-	pop r29
-	pop r28
-	pop r27
-	pop r26
-	ret
-	
-process_twi_status:
-	push r16
-	push r17
-	
-	lds r16, twi_current_state
-	lds r17, twi_current_action
-
-	cpi r17, READ_CALIBRATION_ACTION
-	breq process_twi_status_read_data
-	
-	cpi r17, READ_DATA_ACTION
-	breq process_twi_status_read_data
-	
-	cpi r17, WRITE_DATA_ACTION
-	breq process_twi_status_write_data
-
-process_twi_status_read_data:
-	rjmp process_twi_status_exit
-	
-process_twi_status_write_data:
-	rjmp process_twi_status_exit
-	
-process_twi_status_exit:
-	pop r17
-	pop r16
-	ret
-	
-; store memory pointer to memory location
-; memory location (destination) must be set in X register
-; pointer to store (source), must be set in Y register
-; function does not return any value
-store_pointer_to_mem:
-	st X, r28
-	adiw r26, 0x01		; move to high byte
-	st X, r29
+	call bmp_085_reset_actions_and_states
+	rjmp _sleep_loop
 	ret
 	
 ; send twi status to usrt
@@ -279,119 +109,5 @@ send_to_usart:
 	
 return_from_interrupt:
 	reti
-	
-twi_interrupt:
-	push r16
-	call twi_get_status
-	
-	sts twi_current_state, r24
-	
-	; debug -->
-	push r16
-	mov r16, r24
-	call send_to_usart
-	pop r16
-	mov r24, r16
-	; debug <--
-	
-exit_twi_interrupt:
-	call twi_interrupt_disable
-	;call twi_twint_clear
-	pop r16
-	reti
-	
-; watchdog timeout interrupt
-watchdog_timeout_iterrupt:
-	push r24
-	
-	call watchdog_interrupt_disable
-	
-	; set indirect address for actions queue
-	; clear X register HIGH and LOW byte
-	clr r27	
-	clr r26
-	
-	; load twi_mt_states address to X register (address is 16 bit value)
-	;ldi r26, lo8(twi_mt_states)
-	;ldi r27, hi8(twi_mt_states)
-	
-	;lds r24, twi_next_action			; get next action from variable
-	;sts twi_current_action, r24			; save next action to current action
-	
-	;call flash_led
-	
-	;call twi_send_start_condition
-watchdog_timeout_iterrupt_exit:
-	pop r24
-	reti
-	
-.section data
-;timer0_overflow_interrupt_cnt:
-;.byte 0
-;twi_data_value:
-;.byte 0
-twi_next_state:						; holds pointer to the next state in state queue
-.word 0
-twi_current_action:					; to void ponter movement complexity actions would be just byte and every next action is previous_action + 1		
-.byte 0
-twi_next_action:					; holds pointer to next action in actions queue
-.byte 0
-twi_current_state:
-.byte 0
-
-twi_mt_states_queue:				; master transmis states
-.byte TWI_START_CONDITION
-.byte TWI_RSTART_CONDITION			
-.byte TWI_MT_SLA_W_ACK				; master transmit slave address write acknowlengement recieved			
-.byte TWI_MT_DATA_W_ACK				; master transmit slave address write not acknowlengement recieved
-.byte TWI_NO_STATE_INFO
-.byte TWI_BUS_ERR
-.byte TWI_MT_SLA_W_NACK
-.byte TWI_MT_DATA_W_NACK
-
-twi_mr_states_queue:			; master recieve states
-.byte TWI_START_CONDITION
-.byte TWI_RSTART_CONDITION			
-.byte TWI_MR_SLA_R_ACK			; master recieve slave address read acknowledgement recieved			
-.byte TWI_MR_DATA_R_ACK			; master recieve slave address read not acknowledgement recieved
-.byte TWI_NO_STATE_INFO
-.byte TWI_BUS_ERR
-.byte TWI_MR_SLA_R_NACK
-.byte TWI_MR_DATA_R_NACK
-
-; colibration data values
-bmp085_ac1_val:
-.byte 0
-.byte 0
-bmp085_ac2_val:
-.byte 0
-.byte 0
-bmp085_ac3_val:
-.byte 0
-.byte 0
-bmp085_ac4_val:
-.byte 0
-.byte 0
-bmp085_ac5_val:
-.byte 0
-.byte 0
-bmp085_ac6_val:
-.byte 0
-.byte 0
-bmp085_b1_val:
-.byte 0
-.byte 0
-bmp085_b2_val:
-.byte 0
-.byte 0
-bmp085_mb_val:
-.byte 0
-.byte 0
-bmp085_mc_val:
-.byte 0
-.byte 0
-bmp085_md_val:
-.byte 0
-.byte 0
 
 .end

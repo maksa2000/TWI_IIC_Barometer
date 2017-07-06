@@ -63,11 +63,11 @@ usart_disable_interupts:
 ; do not return any value
 usart_transmit_data:
 	push r16
-usart_transmit_data_loop:
+_usart_transmit_data_loop:
 	; check if UCSR0A usart data register empty bit is set, if not go to the beginning of function
 	lds r16, UCSR0A
 	sbrs r16, UCSR0A_UDRE			; skip next instruction if UCSR0A_UDRE bit in UCSR0A register is set
-	rjmp usart_transmit_data_loop	; using relative jump because it takes lass memory
+	rjmp _usart_transmit_data_loop	; using relative jump because it takes lass memory
 
 	; store data to USART data register (transmit data through USART)
 	sts UDR0, r24
@@ -135,12 +135,12 @@ usart_enable_transmitter:
 	push r16
 	lds r16, UCSR0B
 	cpi r24, 0x00
-	breq usart_disable_transmitter_branch
+	breq _usart_disable_transmitter_branch
 	ori r16, 0x04
-	rjmp usart_enable_transmitter_exit
-usart_disable_transmitter_branch:
+	rjmp _usart_enable_transmitter_exit
+_usart_disable_transmitter_branch:
 	andi r16, 0xF7
-usart_enable_transmitter_exit:
+_usart_enable_transmitter_exit:
 	sts UCSR0B, r16
 	pop r16
 	ret
@@ -151,12 +151,12 @@ usart_enable_reciever:
 	push r16
 	lds r16, UCSR0B
 	cpi r24, 0x00
-	breq usart_disable_reciever_branch
+	breq _usart_disable_reciever_branch
 	ori r16, 0x05
-	rjmp usart_enable_reciever_exit
-usart_disable_reciever_branch:
+	rjmp _usart_enable_reciever_exit
+_usart_disable_reciever_branch:
 	andi r16, 0xEF
-usart_enable_reciever_exit:
+_usart_enable_reciever_exit:
 	sts UCSR0B, r16
 	pop r16
 	ret
@@ -177,7 +177,7 @@ usart_transmit_32bit_data:
 	push r27
 	
 	ldi r17, 0x04				; load loop counter to register
-usart_transmit_32bit_data_load:
+_usart_transmit_32bit_data_load:
 	pop r24						; pop r27 register value from stack to r24 register
 	call hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
 	mov r16, r24				
@@ -187,7 +187,7 @@ usart_transmit_32bit_data_load:
 	call usart_transmit_data	; transmit next value from hex2str function
 	dec r17						; decrement loop counter
 	cpi r17, 0x00
-	brne usart_transmit_32bit_data_load
+	brne _usart_transmit_32bit_data_load
 	; insert line break
 	ldi r24, 0x0A
 	call usart_transmit_data
@@ -212,7 +212,7 @@ usart_transmit_16bit_data:
 	push r25
 	
 	ldi r17, 0x02				; load loop counter to register
-usart_transmit_16bit_data_load:
+_usart_transmit_16bit_data_load:
 	pop r24						; pop r27 register value from stack to r24 register
 	call hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
 	mov r16, r24				
@@ -222,7 +222,7 @@ usart_transmit_16bit_data_load:
 	call usart_transmit_data	; transmit next value from hex2str function
 	dec r17						; decrement loop counter
 	cpi r17, 0x00
-	brne usart_transmit_16bit_data_load
+	brne _usart_transmit_16bit_data_load
 	; insert line break
 	ldi r24, 0x0A
 	call usart_transmit_data
