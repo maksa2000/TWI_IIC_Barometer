@@ -8,39 +8,7 @@ BMP_085_MODULE = 0
 .include "atmega328p_core/watchdog.inc"
 .endif
 
-.text 0
-.equ BMP085_MODULE_ADDR_W, 0xEE
-.equ BMP085_MODULE_ADDR_R, 0xEF
-.equ BMP085_TEMP_REG_ADDR, 0x2E
-.equ BMP085_PRES_REG0_ADDR, 0x34
-.equ BMP085_PRES_REG1_ADDR, 0x74
-.equ BMP085_PRES_REG2_ADDR, 0xB4
-.equ BMP085_PRES_REG3_ADDR, 0xF4
-.equ BMP085_BITRATE_PRESCALER, 0x48
-
-; Calibration coefficients registers
-.equ BMP085_AC1_MSB, 0xAA
-.equ BMP085_AC1_LSB, 0xAB
-.equ BMP085_AC2_MSB, 0xAC
-.equ BMP085_AC2_LSB, 0xAD
-.equ BMP085_AC3_MSB, 0xAE
-.equ BMP085_AC3_LSB, 0xAF
-.equ BMP085_AC4_MSB, 0xB0
-.equ BMP085_AC4_LSB, 0xB1
-.equ BMP085_AC5_MSB, 0xB2
-.equ BMP085_AC5_LSB, 0xB3
-.equ BMP085_AC6_MSB, 0xB4
-.equ BMP085_AC6_LSB, 0xB5
-.equ BMP085_B1_MSB, 0xB6
-.equ BMP085_B1_LSB, 0xB7
-.equ BMP085_B2_MSB, 0xB8
-.equ BMP085_B2_LSB, 0xB9
-.equ BMP085_MB_MSB, 0xBA
-.equ BMP085_MB_LSB, 0xBB
-.equ BMP085_MC_MSB, 0xBC
-.equ BMP085_MC_LSB, 0xBD
-.equ BMP085_MD_MSB, 0xBE
-.equ BMP085_MD_LSB, 0xBF
+;.text 0
 
 ; those functions expect that twi interrupt is enabled
 .global bmp_085_get_temperature
@@ -67,18 +35,18 @@ bmp_085_init:
 ; function recieve through r24 and r25 registers what calibration it should read
 ; r24 - calibration LSB address
 ; r25 - calibration MSB address
+; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
 bmp_085_read_calibrations:
-	; save current state of Z register (will use Z register as base pointer)
-	push r30
-	push r31
+	; save current state of X register (will use X register as base pointer)
+	push r26
+	push r27
 	; move current stack pointer position to Z register
-	in r30, SPL
-	in r31, SPH
+	in r26, SPL
+	in r27, SPH
 	; save recieved values to stack
 	push r24	;- LSB
 	push r25	;- MSB
-	push r16	;- temporary register
-	; if some of calibration values equal 0x0000 or 0xFFFF, that I must reset arduino 
+	
 	call twi_send_start_condition
 	
 	call twi_get_status
@@ -94,60 +62,82 @@ bmp_085_read_calibrations:
 	rjmp _bmp_085_read_calibrations_exit
 	
 _bmp_085_read_calibrations_send_r_address:
+
+	ldi r24, BMP085_MODULE_ADDR_W
+	call twi_send_address
+	
+	;cpi r24, TWI_MR_SLA_R_ACK
+	;breq _bmp_085_read_calibrations_send_reg_address
+	
+	;call bmp_085_error_handler
+	;rjmp _bmp_085_read_calibrations_exit
+
+_bmp_085_read_calibrations_send_reg_address:
+	; load calibration LSB from stack
+	;ld r24, X
+	;call twi_send_address
+	
+	ldi r24, BMP085_AC1_MSB
+	call twi_send_address
+	
+	call twi_send_stop_condition
+	
+;	ldi r24, 0x20
+;dalay_waiting:
+;	call delayFunc
+;	dec r24
+;	cpi r24, 0x00
+;	brne dalay_waiting
+	
+	call twi_init_twcr
+	call twi_send_start_condition
+	
 	ldi r24, BMP085_MODULE_ADDR_R
 	call twi_send_address
 	
-	call twi_get_status
+	ldi r24, BMP085_AC1_MSB
+	call twi_send_address
 	
-	cpi r24, TWI_MR_SLA_R_ACK
-	breq _bmp_085_read_calibrations_send_reg_address
+	call twi_read_data
 	
-	call bmp_085_error_handler
-	rjmp _bmp_085_read_calibrations_exit
-
-_bmp_085_read_calibrations_send_reg_address:
-	; save base pointer to X register
-	movw r24, r30
-	; load calibration LSB from stack
-	ld r16, X
+	; must send acknowledgement before LSB read
+	;call twi_read_data
 	
-	mov r24, r16
-	call twi_send_data
-	
-	; save base pointer to X register
-	movw r24, r30
-	; load calibration MSB from stack
-	adiw r24, 0x01		; move to the next address
-	ld r16, X
-	
-	mov r24, r16
-	call twi_send_data
-	
-	call twi_get_status
+	;call twi_get_status
 	
 	; debug -->
-	;push r16
-	;mov r16, r24
-	;call send_to_usart
-	;pop r16
-	;mov r24, r16
+	push r16
+	mov r16, r24
+	call send_to_usart
+	mov r24, r16
+	pop r16
 	; debug <--
 	
-	cpi r24, TWI_MR_DATA_R_ACK
-	breq _bmp_085_read_calibrations_send_stop
+	; load calibration MSB from stack
+	;sbiw r26, 0x01		; move to the next address
+	;ld r24, X
+	;adiw r26, 0x01		; set base pointer back to initial value
 	
-	call bmp_085_error_handler
-	rjmp _bmp_085_read_calibrations_exit
+	;call twi_send_data
 	
-_bmp_085_read_calibrations_send_stop:
-	call twi_send_stop_condition	
+	;call twi_get_status
+	
+;	cpi r24, TWI_MR_DATA_R_ACK
+;	breq _bmp_085_read_calibrations_send_stop
+;	
+;	call bmp_085_error_handler
+;	rjmp _bmp_085_read_calibrations_exit
+;	
+;_bmp_085_read_calibrations_send_stop:
+;	call twi_send_stop_condition
+;	
+;	call twi_read_data
 	
 _bmp_085_read_calibrations_exit:
-	pop r16
 	pop r25
 	pop r24
-	pop r31
-	pop r30
+	pop r27
+	pop r26
 	ret
 	
 ; resets actions and states variables values
@@ -240,26 +230,6 @@ bmp_085_store_pointer_to_mem:
 bmp_085_get_temperature:
 	ret
 	
-bmp_085_twi_interrupt:
-	push r16
-	call twi_get_status
-	
-	sts twi_current_state, r24
-	
-	; debug -->
-	push r16
-	mov r16, r24
-	call send_to_usart
-	pop r16
-	mov r24, r16
-	; debug <--
-	
-_bmp_085_twi_interrupt_exit:
-	call twi_interrupt_disable
-	;call twi_twint_clear
-	pop r16
-	reti
-	
 ; watchdog timeout interrupt
 bmp_085_watchdog_timeout_iterrupt:
 	push r24
@@ -278,6 +248,44 @@ _bmp_085_watchdog_timeout_iterrupt_exit:
 	pop r24
 	reti
 	
+.equ BMP085_MODULE_ADDR_W, 0xEE
+.equ BMP085_MODULE_ADDR_R, 0xEF
+.equ BMP085_TEMP_REG_ADDR, 0x2E
+.equ BMP085_PRES_REG0_ADDR, 0x34
+.equ BMP085_PRES_REG1_ADDR, 0x74
+.equ BMP085_PRES_REG2_ADDR, 0xB4
+.equ BMP085_PRES_REG3_ADDR, 0xF4
+.equ BMP085_BITRATE_PRESCALER, 0x48
+
+; Calibration coefficients registers
+.equ BMP085_AC1_MSB, 0xAA
+.equ BMP085_AC1_LSB, 0xAB
+.equ BMP085_AC2_MSB, 0xAC
+.equ BMP085_AC2_LSB, 0xAD
+.equ BMP085_AC3_MSB, 0xAE
+.equ BMP085_AC3_LSB, 0xAF
+.equ BMP085_AC4_MSB, 0xB0
+.equ BMP085_AC4_LSB, 0xB1
+.equ BMP085_AC5_MSB, 0xB2
+.equ BMP085_AC5_LSB, 0xB3
+.equ BMP085_AC6_MSB, 0xB4
+.equ BMP085_AC6_LSB, 0xB5
+.equ BMP085_B1_MSB, 0xB6
+.equ BMP085_B1_LSB, 0xB7
+.equ BMP085_B2_MSB, 0xB8
+.equ BMP085_B2_LSB, 0xB9
+.equ BMP085_MB_MSB, 0xBA
+.equ BMP085_MB_LSB, 0xBB
+.equ BMP085_MC_MSB, 0xBC
+.equ BMP085_MC_LSB, 0xBD
+.equ BMP085_MD_MSB, 0xBE
+.equ BMP085_MD_LSB, 0xBF
+
+; actions
+.equ READ_CALIBRATION_ACTION, 0x01
+.equ READ_DATA_ACTION, 0x02
+.equ WRITE_DATA_ACTION, 0x03
+	
 .data 0
 twi_next_state:						; holds pointer to the next state in state queue
 .word 0
@@ -288,6 +296,7 @@ twi_next_action:					; holds pointer to next action in actions queue
 twi_current_state:
 .byte 0
 
+; NOTE! move those tables to Flash memory
 twi_mt_states_queue:				; master transmis states
 .byte TWI_START_CONDITION
 .byte TWI_RSTART_CONDITION			

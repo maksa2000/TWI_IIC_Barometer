@@ -13,7 +13,7 @@ ATMEGA328P_USART = 0
 .global usart_transmit_data
 .global disable_usart_transmitter
 .global enable_usart_transmitter
-.global usart_recieve_data
+;.global usart_recieve_data commented out to same RAM space
 .global set_usart_udre_bit
 .global usart_set_transmit_complete_bit
 .global disable_spi_communication
@@ -104,20 +104,22 @@ usart_set_baud_rate_9600:
 	
 ; set recieve complete bit
 ; function does not recieve or return parameters
-usart_set_receive_complete_bit:
-	push r16
-	lds r16, UCSR0A
-	ori r16, 0x80
-	sts UCSR0A, r16
-	pop r16
-	ret
+; function was commented out to save RAM space
+;usart_set_receive_complete_bit:
+;	push r16
+;	lds r16, UCSR0A
+;	ori r16, 0x80
+;	sts UCSR0A, r16
+;	pop r16
+;	ret
 	
 ; return recieved data through r24 register
-usart_recieve_data:
-	; read data from usart data register
-	lds r24, UDR0
-	call usart_set_udre_bit
-	ret
+; function was commented out to save RAM space
+;usart_recieve_data:
+;	; read data from usart data register
+;	lds r24, UDR0
+;	call usart_set_udre_bit
+;	ret
 	
 ; set usart data register empty bit
 ; do not recieve and not return any parameters

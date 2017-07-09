@@ -35,6 +35,14 @@ twi_init_twcr:
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC5 is disconnected from the port and becomes the Serial Clock I/O pin for the 2-wire Serial Interface.
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC4 is disconnected from the port and becomes the Serial Data I/O pin for the 2-wire Serial Interface.
 	push r16
+	; clear TWDR register
+	lds r16, TWDR
+	cpi r16, 0xFF
+	breq _twi_init_twcr_continue
+	ldi r16, 0xFF
+	sts TWDR, r16
+	
+_twi_init_twcr_continue:
 	ldi r16, 0x44		; 0100 0100b
 	sts TWCR, r16
 	
@@ -53,7 +61,11 @@ twi_send_start_condition:
 	lds r16, TWCR
 	; set START condition bit
 	ori r16, 0x20					; 0010 0000b
-	sts TWCR, r16	
+	sts TWCR, r16
+_twi_send_start_condition_wait:
+	lds r16, TWCR
+	sbrs r16, TWINT_BIT			; TWINT flag bit
+	rjmp _twi_send_start_condition_wait	
 	pop r16
 	ret
 
@@ -64,12 +76,13 @@ twi_send_stop_condition:
 	lds r16, TWCR
 	; set stop condition bit
 	ori r16, 0x10					; 0001 0000b
+	sts TWCR, r16
 	; clear TWINT bit
-	call twi_twint_clear ;do I need to clear it?
-_twi_send_stop_condition_wait:
-	lds r16, TWCR
-	sbrs r16, TWINT_BIT			; TWINT flag bit
-	rjmp _twi_send_stop_condition_wait	
+	call twi_twint_clear
+;_twi_send_stop_condition_wait:
+;	lds r16, TWCR
+;	sbrs r16, TWINT_BIT			; TWINT flag bit
+;	rjmp _twi_send_stop_condition_wait	
 	pop r16
 	ret
 	
@@ -95,38 +108,41 @@ twi_set_twbr_atmega328p_prescaler:
 ; set WTSR prescaler
 ; recieve prescaler in r24 register, use only 1:0 bits from r24 register to set TWSR prescaler bits
 ; function does not return any value
-twi_set_twsr_atmega328p_prescaler:
-	push r16
-	; set prescaler bit values in status register
-	mov r16, r24
-	ori r16, 0xFC		; 1111 1100b
-	sts TWSR, r16
-	pop r16
-	ret
+; This function is commented out to save RAM space
+;twi_set_twsr_atmega328p_prescaler:
+;	push r16
+;	; set prescaler bit values in status register
+;	mov r16, r24
+;	ori r16, 0xFC		; 1111 1100b
+;	sts TWSR, r16
+;	pop r16
+;	ret
 	
 ; set slave devie address
 ; address should be passed in r24 register
 ; do not return any parameters
 ; only for slave devices
-twi_set_device_address:
-	sts TWAR, r24
-	ret
+; This function is commented out to save RAM space
+;twi_set_device_address:
+;	sts TWAR, r24
+;	ret
 	
 ; set read/write mode to TWI address register
 ; should recieve mode in r24 register
 ; if r24 register is 0, 0 will be set in device mode bit, otherwise 1 will be set in device mode bit
 ; return changed value in r24 register
-twi_set_read_write_mode:
-	push r16
-	mov r16, r24
-	cbr r16, 1			; clear 0 bit in r16 register
-	cpi r24, 0x00
-	breq _exit_twi_set_save_device_mode
-	sbr r16, 1			; set first bit in r16
-_exit_twi_set_save_device_mode:
-	mov r24, r16
-	pop r16
-	ret
+; This function is commented out to save RAM space
+;twi_set_read_write_mode:
+;	push r16
+;	mov r16, r24
+;	cbr r16, 1			; clear 0 bit in r16 register
+;	cpi r24, 0x00
+;	breq _exit_twi_set_save_device_mode
+;	sbr r16, 1			; set first bit in r16
+;_exit_twi_set_save_device_mode:
+;	mov r24, r16
+;	pop r16
+;	ret
 	
 ; this function send address of slave device to TWI bus
 ; function recieve address in r24 register
@@ -147,14 +163,25 @@ _twi_send_address_wait:
 ; does not return any value
 twi_send_data:
 	push r16
-	sts TWDR, r24
+	sts TWDR, r24	
 	call twi_twint_clear
+_twi_send_data_wait:
+	lds r16, TWCR
+	sbrs r16, TWINT_BIT
+	rjmp _twi_send_data_wait
 	pop r16
 	ret
 	
 ; reads data from TWI data register and return it through r24 register
 twi_read_data:
+	push r16
+	call twi_twint_clear
+_twi_read_data_wait:
+	lds r16, TWCR
+	sbrs r16, TWINT_BIT
+	rjmp _twi_read_data_wait
 	lds r24, TWDR
+	pop r16
 	ret
 	
 ; return value from twi status register in r24 register
