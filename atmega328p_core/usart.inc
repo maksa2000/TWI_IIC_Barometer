@@ -8,12 +8,13 @@ ATMEGA328P_USART = 0
 .include "converters/numeric_convetrers.inc"
 .endif
 
+.text
 ; .global is needed to set functions visible outside the module
 .global usart_init_rx_tx
 .global usart_transmit_data
 .global disable_usart_transmitter
 .global enable_usart_transmitter
-.global usart_recieve_data
+;.global usart_recieve_data commented out to same RAM space
 .global set_usart_udre_bit
 .global usart_set_transmit_complete_bit
 .global disable_spi_communication
@@ -28,10 +29,10 @@ ATMEGA328P_USART = 0
 usart_init_rx_tx:
 	push r16
 	; set pins states
-	call usart_set_pins_state
+	rcall usart_set_pins_state
 	
 	; setting boud rate to 9600
-	call usart_set_baud_rate_9600
+	rcall usart_set_baud_rate_9600
 	
 	; enable transmit, recieve or data register empty inerrupts
 	;0xF8				; set bit 7, 6, 5, 4, 3 to 1 (transmit, recieve and data register empty interrupt)
@@ -77,7 +78,7 @@ _usart_transmit_data_loop:
 	
 ; sets pins state for USART
 ; do not recieve and return parameters
-; this function should be calling only from init_usart_rx_tx, so I will not save r16 register to stack 
+; this function should be rcalling only from init_usart_rx_tx, so I will not save r16 register to stack 
 usart_set_pins_state:
 	in r16, DDRD
 	ori r16, 0x02		; set DDRD pin1 as output (transmit pin)
@@ -89,7 +90,7 @@ usart_set_pins_state:
 ; UBRR register not hold baud rate, it holds baud rate prescaler 
 ; in async normal mode UBRR = (System Oscillator clock frequency / 16 * baud) - 1 // baud = baud rate for example 9600
 ; examples can be found at table 20-4 Examples of UBRRn Settings for Commonly Used Oscillator Frequencies (in atmega328p datasheet)
-; this function should be calling only from init_usart_rx_tx, so I will not save r16 register to stack 
+; this function should be rcalling only from init_usart_rx_tx, so I will not save r16 register to stack 
 usart_set_baud_rate_9600:
 	push r17
 	
@@ -104,20 +105,22 @@ usart_set_baud_rate_9600:
 	
 ; set recieve complete bit
 ; function does not recieve or return parameters
-usart_set_receive_complete_bit:
-	push r16
-	lds r16, UCSR0A
-	ori r16, 0x80
-	sts UCSR0A, r16
-	pop r16
-	ret
+; function was commented out to save RAM space
+;usart_set_receive_complete_bit:
+;	push r16
+;	lds r16, UCSR0A
+;	ori r16, 0x80
+;	sts UCSR0A, r16
+;	pop r16
+;	ret
 	
 ; return recieved data through r24 register
-usart_recieve_data:
-	; read data from usart data register
-	lds r24, UDR0
-	call usart_set_udre_bit
-	ret
+; function was commented out to save RAM space
+;usart_recieve_data:
+;	; read data from usart data register
+;	lds r24, UDR0
+;	rcall usart_set_udre_bit
+;	ret
 	
 ; set usart data register empty bit
 ; do not recieve and not return any parameters
@@ -179,18 +182,18 @@ usart_transmit_32bit_data:
 	ldi r17, 0x04				; load loop counter to register
 _usart_transmit_32bit_data_load:
 	pop r24						; pop r27 register value from stack to r24 register
-	call hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
+	rcall hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
 	mov r16, r24				
 	mov r24, r25				; should transmit high half byte value first
-	call usart_transmit_data
+	rcall usart_transmit_data
 	mov r24, r16
-	call usart_transmit_data	; transmit next value from hex2str function
+	rcall usart_transmit_data	; transmit next value from hex2str function
 	dec r17						; decrement loop counter
 	cpi r17, 0x00
 	brne _usart_transmit_32bit_data_load
 	; insert line break
 	ldi r24, 0x0A
-	call usart_transmit_data
+	rcall usart_transmit_data
 	; restore passed values from stack
 	pop r27
 	pop r26
@@ -214,18 +217,18 @@ usart_transmit_16bit_data:
 	ldi r17, 0x02				; load loop counter to register
 _usart_transmit_16bit_data_load:
 	pop r24						; pop r27 register value from stack to r24 register
-	call hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
+	rcall hex2str				; convert hex value to string (if value was 0x6D, it should return 6D string in r24:r25 registers)
 	mov r16, r24				
 	mov r24, r25				; should transmit high half byte value first
-	call usart_transmit_data
+	rcall usart_transmit_data
 	mov r24, r16
-	call usart_transmit_data	; transmit next value from hex2str function
+	rcall usart_transmit_data	; transmit next value from hex2str function
 	dec r17						; decrement loop counter
 	cpi r17, 0x00
 	brne _usart_transmit_16bit_data_load
 	; insert line break
 	ldi r24, 0x0A
-	call usart_transmit_data
+	rcall usart_transmit_data
 	; restore passed values from stack
 	pop r25
 	pop r24
@@ -239,7 +242,7 @@ debug_check_ucsr0b_udrie0_bit:
 	push r16
 	lds r16, UCSR0B
 	sbrc r16, 6				; skip next instruction if bit in register is cleared
-	call flash_led
+	rcall flash_led
 	pop r16
 	ret
 	
@@ -248,7 +251,7 @@ debug_check_sreg_interrupt_flag:
 	in r16, SREG
 	;lds r16, SREG_MEM
 	sbrc r16, 7			; global interrupt flag
-	call flash_led
+	rcall flash_led
 	pop r16
 	ret
 	

@@ -21,13 +21,13 @@ hex2str:
 	andi r16, 0x0F
 	
 	; check what number do we have in upper half byte of passed parameter and put appropriate character to r25 register 
-	call r16_value2str
+	rcall r16_value2str
 	mov r25, r16			; move ascii character from r16 to r25
 	
 	mov r16, r24
 	; clear high half byte of r16 value
 	andi r16, 0x0F
-	call r16_value2str
+	rcall r16_value2str
 	mov r24, r16			; move ascii value from r16 to r24
 	
 	; switch r24 and r25 values

@@ -4,6 +4,7 @@ WATCHDOG = 0
 .include "atmega328p_core/const_codes.inc"
 .endif
 
+.text
 ; initialize watchdog timer
 ; function does not take nor recieve parameters
 watchdog_init_interrupt_mode:
