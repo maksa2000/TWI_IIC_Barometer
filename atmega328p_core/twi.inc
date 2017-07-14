@@ -1,5 +1,11 @@
 ATMEGA328P_TWI = 0
 
+.ifndef ATMEGA328P_CONSTANTS
+.include "atmega328p_core/const_codes.inc"
+.endif
+
+.text
+
 .equ TWI_NO_STATE_INFO, 0xF8	; no relevant state information
 .equ TWI_BUS_ERR, 0x00			; bus error
 .equ TWI_START_CONDITION, 0x08
@@ -14,10 +20,6 @@ ATMEGA328P_TWI = 0
 .equ TWI_MR_DATA_R_ACK, 0x50	; master recieved data recieved acknowledgment
 .equ TWI_MR_DATA_R_NACK, 0x58	; not acknowledgment
 .equ TWINT_BIT, 0x07
-
-.ifndef ATMEGA328P_CONSTANTS
-.include "atmega328p_core/const_codes.inc"
-.endif
 
 .global twi_init_twcr
 .global twi_send_start_condition
@@ -46,8 +48,8 @@ _twi_init_twcr_continue:
 	ldi r16, 0x44		; 0100 0100b
 	sts TWCR, r16
 	
-	call twi_clear_twsr_prescaler	
-	call twi_set_pullup_registers
+	rcall twi_clear_twsr_prescaler	
+	rcall twi_set_pullup_registers
 
 	pop r16
 	ret
@@ -57,7 +59,7 @@ _twi_init_twcr_continue:
 twi_send_start_condition:
 	push r16
 	
-	call twi_interrupt_enable
+	rcall twi_interrupt_enable
 	lds r16, TWCR
 	; set START condition bit
 	ori r16, 0x20					; 0010 0000b
@@ -78,7 +80,7 @@ twi_send_stop_condition:
 	ori r16, 0x10					; 0001 0000b
 	sts TWCR, r16
 	; clear TWINT bit
-	call twi_twint_clear
+	rcall twi_twint_clear
 ;_twi_send_stop_condition_wait:
 ;	lds r16, TWCR
 ;	sbrs r16, TWINT_BIT			; TWINT flag bit
@@ -144,13 +146,13 @@ twi_set_twbr_atmega328p_prescaler:
 ;	pop r16
 ;	ret
 	
-; this function send address of slave device to TWI bus
+; this function send byte (address or data) to slave device through TWI bus
 ; function recieve address in r24 register
 ; function will not return any parameters
-twi_send_address:
+twi_send_byte:
 	push r16	
 	sts TWDR, r24
-	call twi_clear_start_condition	; clearing START condition will also clear TWINT bit
+	rcall twi_clear_start_condition	; clearing START condition will also clear TWINT bit
 _twi_send_address_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT
@@ -158,24 +160,10 @@ _twi_send_address_wait:
 	pop r16
 	ret
 	
-; set data to TWDR data register, that should be send
-; recieve data in r24 register
-; does not return any value
-twi_send_data:
-	push r16
-	sts TWDR, r24	
-	call twi_twint_clear
-_twi_send_data_wait:
-	lds r16, TWCR
-	sbrs r16, TWINT_BIT
-	rjmp _twi_send_data_wait
-	pop r16
-	ret
-	
 ; reads data from TWI data register and return it through r24 register
 twi_read_data:
 	push r16
-	call twi_twint_clear
+	rcall twi_twint_clear
 _twi_read_data_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT

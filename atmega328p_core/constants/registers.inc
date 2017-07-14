@@ -2,6 +2,7 @@
 
 ATMEGA328P_REGISTER_CODES = 0 	; define ATMEGA328P_REGISTER_CODES
 
+.text
 .equ EIMSK, 0x1D			; EIMSK lies in the address range that is supported by OUT. if you refer it via data store/load instructions you have to add some constant (0x20) to its address
 .equ EICRA, 0x69			; external interupt control register A
 .equ MCUCR, 0x35			; MCU Control register
