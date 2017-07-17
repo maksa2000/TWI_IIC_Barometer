@@ -118,6 +118,18 @@ read_bmp085_calibrations:
 	ldi r16, 0x0B
 _read_bmp085_calibrations_loop:
 
+	; debug -->
+	push r24
+	rcall send_to_usart
+	mov r24, r25
+	rcall send_to_usart
+	pop r24
+	;push r24
+	;lds r24, TWCR
+	;rcall send_to_usart
+	;pop r24
+	; debug <--
+
 	; load calibration address to r25:r24 registers
 	mov r25, r26			; load MSB
 	inc r26					; move to LSB
@@ -127,16 +139,26 @@ _read_bmp085_calibrations_loop:
 	; TODO: check this function stack (it seems broken)
 	rcall bmp_085_read_calibration
 	
-	; debug -->
-	push r24
-	rcall send_to_usart
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	; debug <--
+	; check that actual value was recieved (0x0000 or 0xFFFF will be recieved in case of error)
+	cpi r24, 0xFF
+	brne _read_bmp085_calibrations_zero_check
 	
-	; here should be error checking 
+	cpi r25, 0xFF
+	brne _read_bmp085_calibrations_zero_check
 	
+	rcall bmp_085_error_handler
+	
+_read_bmp085_calibrations_zero_check:
+	; if recieved value not 0xFFFF, then check for 0x0000
+	cpi r24, 0x00
+	brne _read_bmp085_calibrations_save_callibration
+	
+	cpi r25, 0x00
+	brne _read_bmp085_calibrations_save_callibration
+
+	rcall bmp_085_error_handler
+	
+_read_bmp085_calibrations_save_callibration:
 	; save readed values to variable
 	st Y, r25
 	adiw r28, 0x01		; move to next variable
@@ -181,10 +203,5 @@ send_to_usart:
 	
 return_from_interrupt:
 	reti
-
-;.data
-;.org 0x00A0				; set correct address for data segment to 0x0100 (beginning of internal SRAM)
-;test1:
-;.byte 0x06
 
 .end

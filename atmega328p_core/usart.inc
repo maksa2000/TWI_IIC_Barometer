@@ -9,20 +9,6 @@ ATMEGA328P_USART = 0
 .endif
 
 .text
-; .global is needed to set functions visible outside the module
-.global usart_init_rx_tx
-.global usart_transmit_data
-.global disable_usart_transmitter
-.global enable_usart_transmitter
-;.global usart_recieve_data commented out to same RAM space
-.global set_usart_udre_bit
-.global usart_set_transmit_complete_bit
-.global disable_spi_communication
-.global usart_calc_baud_rate_prescaler
-.global usart_transmit_32bit_data
-.global usart_enable_reciever
-.global usart_set_baud_rate_9600
-
 ; init usart communication
 ; this function does not recieve any arguments and does not return any value
 ; Global Interrupt Flag should be cleared (and interrupts globally disabled) when doing the initialization

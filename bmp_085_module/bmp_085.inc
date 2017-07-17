@@ -47,11 +47,6 @@ BMP_085_MODULE = 0
 .equ READ_DATA_ACTION, 0x02
 .equ WRITE_DATA_ACTION, 0x03
 
-; those functions expect that twi interrupt is enabled
-.global bmp_085_get_temperature
-.global bmp_085_read_calibrations
-.global bmp_085_reset_actions_and_states
-
 ; initialize interfaces and internal variables for bmp085
 ; function does not take nor recieve parameters
 bmp_085_init:
@@ -81,15 +76,7 @@ bmp_085_read_calibration:
 	push r26
 	push r27
 	; move current stack pointer position to Z register
-	in r26, SPL
-	
-	; debug -->
-	push r24
-	in r24, SPL
-	;rcall send_to_usart
-	pop r24
-	; debug <--
-	
+	in r26, SPL	
 	in r27, SPH
 	; save recieved values to stack
 	push r24	;- LSB
@@ -99,6 +86,13 @@ bmp_085_read_calibration:
 	push r25	;- space reserved for MSB
 	
 	rcall twi_send_start_condition
+	
+	; debug -->
+	;push r24
+	;in r24, SPL
+	;rcall send_to_usart
+	;pop r24
+	; debug <--
 	
 	rcall twi_get_status
 	
@@ -228,12 +222,21 @@ _bmp_085_read_calibration_send_reg_address2_r:
 	rcall twi_send_stop_condition
 	pop r24					; restore status from stack
 	
+	rcall twi_clear_stop_condition
+	
+	; debug -->
+	;push r24
+	;in r24, SPL
+	;rcall send_to_usart
+	;pop r24
+	; debug <--
+	
 	cpi r24, TWI_MR_DATA_R_ACK
 	breq _bmp_085_read_calibration_exit
 	
 	rcall bmp_085_error_handler	
 	
-_bmp_085_read_calibration_exit:
+_bmp_085_read_calibration_exit:	
 	; resore return value from stack
 	sbiw r26, 0x02 		; move to correct stack address
 	ld r24, X			; save LSB from stack
@@ -243,15 +246,7 @@ _bmp_085_read_calibration_exit:
 	adiw r26, 0x03		; set base pointer back to initial value
 
 	; set stack pointer to base pointer
-	out SPL, r26
-	
-	; debug -->
-	push r24
-	in r24, SPL
-	;rcall send_to_usart
-	pop r24
-	; debug <--
-	
+	out SPL, r26	
 	out SPH, r27
 	pop r27
 	pop r26

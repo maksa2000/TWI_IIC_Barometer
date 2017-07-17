@@ -7,9 +7,6 @@
 .include "atmega328p_core/const_codes.inc"
 .endif
 
-; .global is needed to set functions visible outside the module
-.global init_int0
-
 init_int0:
 	push r16		; store value of r16 register, this register will be using in function
 	; set PORTD pin2 as input

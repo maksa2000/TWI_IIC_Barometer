@@ -3,9 +3,6 @@
 
 NUMERIC_CONVERTERS = 0
 
-.global hex2str
-.global r16_value2str
-
 ; this function will convert hexadecimal byte to string
 ; byte value should be passed through r24 register
 ; string value will be returned in r24:r25 registers

@@ -20,17 +20,6 @@ ATMEGA328P_TWI = 0
 .equ TWI_MR_DATA_R_ACK, 0x50	; master recieved data recieved acknowledgment
 .equ TWI_MR_DATA_R_NACK, 0x58	; not acknowledgment
 .equ TWINT_BIT, 0x07
-
-.global twi_init_twcr
-.global twi_send_start_condition
-.global twi_send_stop_condition
-.global twi_set_atmega328p_prescaler
-.global twi_write_data
-.global twi_read_data
-.global twi_set_device_address
-.global twi_set_read_write_mode
-.global twi_twint_clear
-.global twi_send_address
 	
 ; this function does not take any parameter and set TWCR register to START state
 twi_init_twcr:
@@ -95,6 +84,16 @@ twi_clear_start_condition:
 	push r16
 	lds r16, TWCR
 	andi r16, 0xDF		; 1101 1111b	
+	sts TWCR, r16
+	pop r16
+	ret
+	
+; clears stop condition from TWCR register
+; this function does not take or recieve any parameters
+twi_clear_stop_condition:
+	push r16
+	lds r16, TWCR
+	andi r16, 0xEF		; 1110 1111b	
 	sts TWCR, r16
 	pop r16
 	ret
