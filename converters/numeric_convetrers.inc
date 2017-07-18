@@ -3,6 +3,8 @@
 
 NUMERIC_CONVERTERS = 0
 
+.text
+
 ; this function will convert hexadecimal byte to string
 ; byte value should be passed through r24 register
 ; string value will be returned in r24:r25 registers

@@ -9,7 +9,7 @@ jmp return_from_interrupt					; 0x0004
 jmp return_from_interrupt					; 0x0006
 jmp return_from_interrupt					; 0x0008
 jmp return_from_interrupt					; 0x000A
-jmp return_from_interrupt;bmp_085_watchdog_timeout_iterrupt		; 0x000C		watchdog timeout interrupt
+jmp bmp_085_watchdog_timeout_iterrupt		; 0x000C		watchdog timeout interrupt
 jmp return_from_interrupt					; 0x000E
 jmp return_from_interrupt					; 0x0010
 jmp return_from_interrupt					; 0x0012
@@ -78,21 +78,58 @@ main:
 	; init usart
 	; USART for some reason generates TWI interrupt, so I disable it
 	rcall usart_init_rx_tx
-	rcall usart_disable_interupts
-	
+	rcall usart_disable_interupts	
+
 	; initialize interfaces and internal variables for bmp085 
-	rcall bmp_085_init
-	
-	;rcall watchdog_init_interrupt_mode							
+	rcall bmp_085_init	
 	
 	sei
 	
 	rcall read_bmp085_calibrations
 	
 _sleep_loop:	
+	;rcall watchdog_init_interrupt_mode
 	sleep
-	;rcall bmp_085_reset_actions_and_states
+	;rcall read_bmp085_sensor_values
 	rjmp _sleep_loop
+	ret
+	
+; read values from BMP_085 sensor
+read_bmp085_sensor_values:
+	push r24
+	push r25
+	
+	ldi r24, BMP085_TEMP_REG_ADDR
+	rcall bmp_085_request_sensor_data
+	
+	rcall delayFunc
+	
+	rcall bmp_085_read_sensor_data
+	
+	;rcall bmp_085_read_sensor_data
+	
+	;ldi r24, BMP085_PRES_REG0_ADDR
+	;rcall bmp_085_read_sensor_data
+	
+	;ldi r24, 0x2E;BMP085_PRES_REG1_ADDR
+	;rcall bmp_085_read_sensor_data
+	
+	;ldi r24, BMP085_PRES_REG2_ADDR
+	;rcall bmp_085_read_sensor_data
+	
+	; debug -->
+	;push r24
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
+	; debug <--
+	
+	;ldi r24, BMP085_PRES_REG3_ADDR
+	;rcall bmp_085_read_sensor_data
+	
+	pop r25
+	pop r24
 	ret
 	
 ; reads BMP085 calibrations
@@ -104,39 +141,26 @@ read_bmp085_calibrations:
 	push r24
 	push r25
 	push r26
+	push r27
 	push r28
 	push r29
 	
 	; initializing calibration address
 	ldi r26, BMP085_AC1_MSB
+	ldi r27, 0x02									; size of byte to increment r26 registers value
 	
 	; initial Y register
 	ldi r28, pm_lo8(bmp085_calibration_values)		; not sure what is difference, but seems that pm_lo8 is used in memory operations
 	ldi r29, pm_hi8(bmp085_calibration_values)
 	
 	; initial counter
-	ldi r16, 0x0B
-_read_bmp085_calibrations_loop:
-
-	; debug -->
-	push r24
-	rcall send_to_usart
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	;push r24
-	;lds r24, TWCR
-	;rcall send_to_usart
-	;pop r24
-	; debug <--
-
-	; load calibration address to r25:r24 registers
-	mov r25, r26			; load MSB
-	inc r26					; move to LSB
-	mov r24, r26			; load LSB
-	inc r26					; move next 16bit address
+	ldi r16, 0x0B				; 11 dec
 	
-	; TODO: check this function stack (it seems broken)
+_read_bmp085_calibrations_loop:		
+	; load calibration address to r24 register
+	mov r24, r26
+	add r26, r27			; move next address
+	
 	rcall bmp_085_read_calibration
 	
 	; check that actual value was recieved (0x0000 or 0xFFFF will be recieved in case of error)
@@ -159,11 +183,12 @@ _read_bmp085_calibrations_zero_check:
 	rcall bmp_085_error_handler
 	
 _read_bmp085_calibrations_save_callibration:
+
 	; save readed values to variable
 	st Y, r25
-	adiw r28, 0x01		; move to next variable
+	adiw r28, 0x01		; move to next byte
 	st Y, r24
-	adiw r28, 0x01		; move to next 16bit variable
+	adiw r28, 0x01		; move to next byte
 	
 	dec r16
 	; continue while r16 != 0
@@ -171,6 +196,7 @@ _read_bmp085_calibrations_save_callibration:
 	
 	pop r29
 	pop r28
+	pop r27
 	pop r26
 	pop r25
 	pop r24
@@ -189,17 +215,27 @@ send_to_usart:
 	pop r24
 	ret
 	
-;delayFunc:
-;    ldi  r18, 41
-;    ldi  r19, 150
-;    ldi  r20, 128
-;L1: dec  r20
-;    brne L1
-;    dec  r19
-;    brne L1
-;    dec  r18
-;    brne L1
-;	ret
+delayFunc:
+	push r18
+	push r19
+	push r20
+	
+    ldi  r18, 254
+    ldi  r19, 254
+    ldi  r20, 254
+
+L1:
+	dec  r20
+    brne L1
+    dec  r19
+    brne L1
+    dec  r18
+    brne L1
+	
+	pop r20
+	pop r19
+	pop r18
+	ret
 	
 return_from_interrupt:
 	reti

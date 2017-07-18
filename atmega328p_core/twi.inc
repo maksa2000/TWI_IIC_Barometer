@@ -20,8 +20,12 @@ ATMEGA328P_TWI = 0
 .equ TWI_MR_DATA_R_ACK, 0x50	; master recieved data recieved acknowledgment
 .equ TWI_MR_DATA_R_NACK, 0x58	; not acknowledgment
 .equ TWINT_BIT, 0x07
+.equ TWSTO_BIT, 0x04
+
 	
-; this function does not take any parameter and set TWCR register to START state
+; this function take 1 parameter from r24 register and initialize with it TWCR register
+; r24 - initial value for TWCR register
+; value from r24 register will be stored in twcr_init_value variable
 twi_init_twcr:
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC5 is disconnected from the port and becomes the Serial Clock I/O pin for the 2-wire Serial Interface.
 	; When the TWEN bit in TWCR is set (one) to enable the 2-wire Serial Interface, pin PC4 is disconnected from the port and becomes the Serial Data I/O pin for the 2-wire Serial Interface.
@@ -34,8 +38,8 @@ twi_init_twcr:
 	sts TWDR, r16
 	
 _twi_init_twcr_continue:
-	ldi r16, 0x44		; 0100 0100b
-	sts TWCR, r16
+	sts twi_twcr_init_value, r24	
+	sts TWCR, r24
 	
 	rcall twi_clear_twsr_prescaler	
 	rcall twi_set_pullup_registers
@@ -48,11 +52,14 @@ _twi_init_twcr_continue:
 twi_send_start_condition:
 	push r16
 	
-	rcall twi_interrupt_enable
-	lds r16, TWCR
+	lds r16, twi_twcr_init_value
+	
 	; set START condition bit
 	ori r16, 0x20					; 0010 0000b
 	sts TWCR, r16
+	
+	rcall twi_twint_clear
+	
 _twi_send_start_condition_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT			; TWINT flag bit
@@ -62,18 +69,19 @@ _twi_send_start_condition_wait:
 
 ; sends sstop condition to the device
 ; function does not take nor recieve parameters
+; stop condition bit will be cleared automatically, when stop condition is send
 twi_send_stop_condition:
 	push r16
 	lds r16, TWCR
 	; set stop condition bit
 	ori r16, 0x10					; 0001 0000b
+	
 	sts TWCR, r16
-	; clear TWINT bit
-	rcall twi_twint_clear
-;_twi_send_stop_condition_wait:
-;	lds r16, TWCR
-;	sbrs r16, TWINT_BIT			; TWINT flag bit
-;	rjmp _twi_send_stop_condition_wait	
+	
+_twi_send_stop_condition_wait:
+	lds r16, TWCR
+	sbrc r16, TWSTO_BIT			; TWINT flag bit
+	rjmp _twi_send_stop_condition_wait	
 	pop r16
 	ret
 	
@@ -84,16 +92,6 @@ twi_clear_start_condition:
 	push r16
 	lds r16, TWCR
 	andi r16, 0xDF		; 1101 1111b	
-	sts TWCR, r16
-	pop r16
-	ret
-	
-; clears stop condition from TWCR register
-; this function does not take or recieve any parameters
-twi_clear_stop_condition:
-	push r16
-	lds r16, TWCR
-	andi r16, 0xEF		; 1110 1111b	
 	sts TWCR, r16
 	pop r16
 	ret
@@ -149,9 +147,11 @@ twi_set_twbr_atmega328p_prescaler:
 ; function recieve address in r24 register
 ; function will not return any parameters
 twi_send_byte:
-	push r16	
+	push r16
+	
 	sts TWDR, r24
 	rcall twi_clear_start_condition	; clearing START condition will also clear TWINT bit
+	
 _twi_send_address_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT
@@ -226,5 +226,10 @@ twi_interrupt_disable:
 	sts TWCR, r16
 	pop r16
 	ret
+	
+.data 0
+.org 0x00A0							; set correct address for data segment to 0x0100 (beginning of internal SRAM)	
+twi_twcr_init_value:
+.byte 0
 	
 	
