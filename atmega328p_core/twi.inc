@@ -53,17 +53,15 @@ twi_send_start_condition:
 	push r16
 	
 	lds r16, twi_twcr_init_value
-	
 	; set START condition bit
-	ori r16, 0x20					; 0010 0000b
-	sts TWCR, r16
-	
-	rcall twi_twint_clear
+	ori r16, 0xA4							; 1010 0100b	(to generate START and RSTART conditions all 3 bits must be writen simultaneously)
+	sts TWCR, r16	
 	
 _twi_send_start_condition_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT			; TWINT flag bit
 	rjmp _twi_send_start_condition_wait	
+	
 	pop r16
 	ret
 
@@ -72,10 +70,11 @@ _twi_send_start_condition_wait:
 ; stop condition bit will be cleared automatically, when stop condition is send
 twi_send_stop_condition:
 	push r16
+	
 	lds r16, TWCR
+	
 	; set stop condition bit
 	ori r16, 0x10					; 0001 0000b
-	
 	sts TWCR, r16
 	
 _twi_send_stop_condition_wait:
@@ -152,10 +151,11 @@ twi_send_byte:
 	sts TWDR, r24
 	rcall twi_clear_start_condition	; clearing START condition will also clear TWINT bit
 	
-_twi_send_address_wait:
+_twi_send_byte_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT
-	rjmp _twi_send_address_wait
+	rjmp _twi_send_byte_wait
+	
 	pop r16
 	ret
 	
@@ -163,11 +163,13 @@ _twi_send_address_wait:
 twi_read_data:
 	push r16
 	rcall twi_twint_clear
+	
 _twi_read_data_wait:
 	lds r16, TWCR
 	sbrs r16, TWINT_BIT
 	rjmp _twi_read_data_wait
 	lds r24, TWDR
+	
 	pop r16
 	ret
 	
@@ -226,6 +228,17 @@ twi_interrupt_disable:
 	sts TWCR, r16
 	pop r16
 	ret
+	
+; disable acknowledgement sending
+; on start candition sending ack bit will be loaded from twi_twcr_init_value variable
+twi_ack_diable:
+	push r16
+	lds r16, TWCR
+	andi r16, 0xBF		; 1011 1111b
+	sts TWCR, r16
+	pop r16
+	ret
+	
 	
 .data 0
 .org 0x00A0							; set correct address for data segment to 0x0100 (beginning of internal SRAM)	

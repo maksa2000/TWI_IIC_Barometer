@@ -56,7 +56,7 @@ bmp_085_init:
 	push r24
 	
 	; set TWI control register to start mode
-	ldi r24, 0x44					; pass initial TWCR register value to the function
+	ldi r24, 0x44					; pass initial TWCR register value to the function (0100 0100b)
 	rcall twi_init_twcr
 	
 	; set bit rate prescaler for atmega328p
@@ -343,7 +343,6 @@ _bmp_085_read_calibration_send_address_w:
 _bmp_085_read_calibration_send_reg_address_w:	
 	; load calibration address from the stack
 	ld r24, X
-	
 	rcall twi_send_byte
 	
 	rcall twi_get_status
@@ -354,7 +353,7 @@ _bmp_085_read_calibration_send_reg_address_w:
 	rjmp _bmp_085_read_calibration_exit
 	
 _bmp_085_read_calibration_send_stop_w:	
-	rcall twi_send_stop_condition
+	;rcall twi_send_stop_condition
 	
 	rcall twi_send_start_condition
 	
@@ -402,6 +401,8 @@ _bmp_085_read_calibration_send_reg_address_r:	; read MSB byte
 	rcall bmp_085_error_handler
 	
 _bmp_085_read_calibration_send_reg_address2_r:	; read LSB byte
+	rcall twi_ack_diable
+	
 	; load calibration address from stack
 	ld r24, X
 	rcall twi_send_byte
@@ -416,19 +417,13 @@ _bmp_085_read_calibration_send_reg_address2_r:	; read LSB byte
 	
 	rcall twi_get_status
 	
-	cpi r24, TWI_MR_DATA_R_ACK
+	cpi r24, TWI_MR_DATA_R_NACK
 	breq _bmp_085_read_calibration_exit
 	rcall bmp_085_error_handler
 	
 _bmp_085_read_calibration_exit:	
 	
 	rcall twi_send_stop_condition
-	
-	; dbg
-	push r24
-	rcall send_to_usart
-	pop r24
-	; dbg
 
 	; resore return value from stack
 	sbiw r26, 0x01 		; move to correct stack address
