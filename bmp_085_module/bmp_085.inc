@@ -11,11 +11,12 @@ BMP_085_MODULE = 0
 .text
 .equ BMP085_MODULE_ADDR_W, 0xEE
 .equ BMP085_MODULE_ADDR_R, 0xEF
-.equ BMP085_TEMP_REG_ADDR, 0x2E
-.equ BMP085_PRES_REG0_ADDR, 0x34
-.equ BMP085_PRES_REG1_ADDR, 0x74
-.equ BMP085_PRES_REG2_ADDR, 0xB4
-.equ BMP085_PRES_REG3_ADDR, 0xF4
+.equ BMP085_TEMP_CTRL_ADDR, 0x2E
+.equ BMP085_PRES0_CTRL_ADDR, 0x34
+.equ BMP085_PRES1_CTRL_ADDR, 0x74
+.equ BMP085_PRES2_CTRL_ADDR, 0xB4
+.equ BMP085_PRES3_CTRL_ADDR, 0xF4
+.equ BMP085_MEASURE_REG_ADDR, 0xF4
 .equ BMP085_BITRATE_PRESCALER, 0x48
 
 ; Calibration coefficients registers
@@ -112,7 +113,7 @@ _bmp_085_request_sensor_data_send_address_w:
 	
 _bmp_085_request_sensor_data_send_reg_address_w:
 	; load calibration address from the stack
-	ldi r24, 0xF4
+	ldi r24, BMP085_MEASURE_REG_ADDR
 	rcall twi_send_byte
 	
 	rcall twi_get_status
@@ -124,9 +125,8 @@ _bmp_085_request_sensor_data_send_reg_address_w:
 
 _bmp_085_request_sensor_data_send_control_value_w:
 	; load control address from the stack
-	sbiw r26, 0x01		; set X register to location of control address position
 	ld r24, X
-	adiw r26, 0x01		; set X register back to base pointer 
+	
 	rcall twi_send_byte
 	
 	rcall twi_get_status
@@ -148,154 +148,17 @@ _bmp_085_request_sensor_data_exit:
 	
 	ret
 	
-	
-	
-; reads sensor values from BMP085
-; function recieve through r24 sensor address
-; r24 - sensor address
-; function returns 16 bit calibration value
-; r24 - data LSB
-; r25 - data MSB
-bmp_085_read_sensor_data:
-	; save current state of X register (will use X register as base pointer)
-	push r26
-	push r27
-	; move current stack pointer position to X register
-	in r26, SPL	
-	in r27, SPH
-	; save recieved values to stack
-	push r24	;- sensor address
-	; reserve 16 bit in the stack for saving return value
-	sbiw r26, 0x02
-	out SPL, r26
-	out SPH, r27
-	adiw r26, 0x02		; set base pointer back
-	
-	rcall twi_send_start_condition
-	
-	rcall twi_get_status
-	
-; if status not equal START or RSTART execute error_handler and exit
-	cpi r24, TWI_START_CONDITION
-	breq _bmp_085_read_sensor_data_send_address_w
-	
-	cpi r24, TWI_RSTART_CONDITION
-	breq _bmp_085_read_sensor_data_send_address_w
-	
-	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_sensor_data_exit
 
-_bmp_085_read_sensor_data_send_address_w:
 
-	ldi r24, BMP085_MODULE_ADDR_W
-	rcall twi_send_byte
-	
-	rcall twi_get_status
-	
-	cpi r24, TWI_MT_SLA_W_ACK
-	breq _bmp_085_read_sensor_data_send_restart_condition
-	
-	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_sensor_data_exit
-	
-_bmp_085_read_sensor_data_send_restart_condition:
-
-	;rcall twi_send_stop_condition	
-
-	rcall twi_send_start_condition
-	
-	rcall twi_get_status
-	
-; if status not equal START or RSTART execute error_handler and exit
-	cpi r24, TWI_START_CONDITION
-	breq _bmp_085_read_sensor_data_send_address_r
-	
-	cpi r24, TWI_RSTART_CONDITION
-	breq _bmp_085_read_sensor_data_send_address_r
-	
-	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_sensor_data_exit
-	
-_bmp_085_read_sensor_data_send_address_r:
-	ldi r24, BMP085_MODULE_ADDR_R
-	rcall twi_send_byte
-	
-	rcall twi_get_status
-	
-	cpi r24, TWI_MR_SLA_R_ACK
-	breq _bmp_085_read_sensor_data_send_reg_address_r
-	
-	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_sensor_data_exit
-
-_bmp_085_read_sensor_data_send_reg_address_r:
-	; send sensor address
-	ldi r24, BMP085_CONV_RESULT_MSB		; read data from MSB register	
-	rcall twi_send_byte
-	
-	rcall twi_get_status
-	
-	; read data MSB
-	rcall twi_read_data
-	
-	; save MSB to reserved stack position
-	sbiw r26, 0x02 		; move to correct stack address
-	st X, r24			; save MSB to stack
-	adiw r26, 0x02		; set base pointer back to initial value
-	
-	rcall twi_get_status
-	
-	cpi r24, TWI_MR_DATA_R_ACK
-	breq _bmp_085_read_sensor_data_send_reg_address2_r
-	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_sensor_data_exit
-	
-_bmp_085_read_sensor_data_send_reg_address2_r:
-	; send sensor address
-	ldi r24, BMP085_CONV_RESULT_LSB			; read data from LSB register
-	rcall twi_send_byte
-	
-	; read data LSB
-	rcall twi_read_data
-	
-	; save LSB to reserved stack position
-	sbiw r26, 0x01 		; move to correct stack address
-	st X, r24			; save LSB to stack
-	adiw r26, 0x01		; set base pointer back to initial value
-	
-	rcall twi_get_status
-	
-	cpi r24, TWI_MR_DATA_R_ACK
-	breq _bmp_085_read_sensor_data_exit
-	
-	rcall bmp_085_error_handler	
-	
-_bmp_085_read_sensor_data_exit:	
-
-	rcall twi_send_stop_condition	
-	
-	; resore return value from stack
-	sbiw r26, 0x01 		; move to correct stack address
-	ld r24, X			; save LSB from stack
-	adiw r26, 0x01		; set base pointer back to initial value
-	sbiw r26, 0x02 		; move to correct stack address
-	ld r25, X			; save MSB from stack
-	adiw r26, 0x02		; set base pointer back to initial value
-
-	; set stack pointer to base pointer
-	out SPL, r26	
-	out SPH, r27
-	pop r27
-	pop r26
-	ret
-
-; reads calibration values from BMP085 sersor EEPROM
-; function recieve through r24 register what calibration it should read
-; r24 - calibration address
-; function returns 16 bit calibration value in r25:r24 registers
-; r24 - LSB calibration value
-; r25 - MSB calibration value
-bmp_085_read_calibration:
+; reads data from BMP085 EEPROM or sensors
+; function recieve 3 parameters through r23, r25:r24 registers
+; r23 - register address to read
+; r25 - MSB address to read
+; r24 - LSB address to read
+; function returns 16 bit value in r25:r24 registers
+; r24 - recieved LSB value
+; r25 - recieved MSB value
+bmp_085_read_data:
 	; save current state of X register (will use X register as base pointer)
 	push r26
 	push r27
@@ -303,15 +166,17 @@ bmp_085_read_calibration:
 	in r26, SPL	
 	in r27, SPH
 	; save recieved value to stack
-	push r24	;- callibration address
+	push r23	; register address [base]
+	push r25	; MSB address [base + 0x01]
+	push r24 	; LSB address [base + 0x02]
 	; reserve 16bit for return data
-	; [base + 0x01] - MSB
-	; [base + 0x02] - LSB
+	; [base + 0x03] - return MSB
+	; [base + 0x04] - return LSB
 	
-	sbiw r26, 0x03		; because since saving stack pointer value stack pointer was growing with 3 bytes
+	sbiw r26, 0x05		; because since saving stack pointer value stack pointer was growing with 3 bytes, current r26 should be decreased for 5 bytes
 	out SPL, r26
 	out SPH, r27
-	adiw r26, 0x03		; set base pointer back
+	adiw r26, 0x05		; set base pointer back
 	
 	rcall twi_send_start_condition
 	
@@ -319,15 +184,12 @@ bmp_085_read_calibration:
 	
 	; if status not equal START or RSTART execute error_handler and exit
 	cpi r24, TWI_START_CONDITION
-	breq _bmp_085_read_calibration_send_address_w
-	
-	cpi r24, TWI_RSTART_CONDITION
-	breq _bmp_085_read_calibration_send_address_w
+	breq _bmp_085_read_data_send_address_w
 	
 	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_calibration_exit
+	rjmp _bmp_085_read_data_exit
 	
-_bmp_085_read_calibration_send_address_w:
+_bmp_085_read_data_send_address_w:
 
 	ldi r24, BMP085_MODULE_ADDR_W
 	rcall twi_send_byte
@@ -335,109 +197,112 @@ _bmp_085_read_calibration_send_address_w:
 	rcall twi_get_status
 	
 	cpi r24, TWI_MT_SLA_W_ACK
-	breq _bmp_085_read_calibration_send_reg_address_w
+	breq _bmp_085_read_data_send_reg_address_w
 	
 	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_calibration_exit
+	rjmp _bmp_085_read_data_exit
 
-_bmp_085_read_calibration_send_reg_address_w:	
-	; load calibration address from the stack
+_bmp_085_read_data_send_reg_address_w:	
+	; load register address from the stack
 	ld r24, X
 	rcall twi_send_byte
 	
 	rcall twi_get_status
 	
 	cpi r24, TWI_MT_DATA_W_ACK
-	breq _bmp_085_read_calibration_send_stop_w
+	breq _bmp_085_read_data_send_stop_w
 	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_calibration_exit
+	rjmp _bmp_085_read_data_exit
 	
-_bmp_085_read_calibration_send_stop_w:	
-	;rcall twi_send_stop_condition
+_bmp_085_read_data_send_stop_w:	
 	
 	rcall twi_send_start_condition
 	
 	rcall twi_get_status
 	
 ; if status not equal START or RSTART execute error_handler and exit
-	cpi r24, TWI_START_CONDITION
-	breq _bmp_085_read_calibration_send_address_r
 	
 	cpi r24, TWI_RSTART_CONDITION
-	breq _bmp_085_read_calibration_send_address_r
+	breq _bmp_085_read_data_send_address_r
 	
 	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_calibration_exit
+	rjmp _bmp_085_read_data_exit
 	
-_bmp_085_read_calibration_send_address_r:
+_bmp_085_read_data_send_address_r:
 	ldi r24, BMP085_MODULE_ADDR_R
 	rcall twi_send_byte
 	
 	rcall twi_get_status
 	
 	cpi r24, TWI_MR_SLA_R_ACK
-	breq _bmp_085_read_calibration_send_reg_address_r
+	breq _bmp_085_read_data_send_reg_address_r
 	
 	rcall bmp_085_error_handler
-	rjmp _bmp_085_read_calibration_exit
+	rjmp _bmp_085_read_data_exit
 
-_bmp_085_read_calibration_send_reg_address_r:	; read MSB byte
-	; load calibration address from stack
+_bmp_085_read_data_send_reg_address_r:	; read MSB byte
+	; load MSB address from stack
+	sbiw r26, 0x01
 	ld r24, X
+	adiw r26, 0x01
 	rcall twi_send_byte
 	
-	; read calibration data
+	; read data
 	rcall twi_read_data
 	
 	; save data to MSB return value
-	sbiw r26, 0x01
+	sbiw r26, 0x03
 	st X, r24
-	adiw r26, 0x01
+	adiw r26, 0x03
 	
 	rcall twi_get_status
 	
 	cpi r24, TWI_MR_DATA_R_ACK
-	breq _bmp_085_read_calibration_send_reg_address2_r
+	breq _bmp_085_read_data_send_reg_address2_r
 	rcall bmp_085_error_handler
 	
-_bmp_085_read_calibration_send_reg_address2_r:	; read LSB byte
+_bmp_085_read_data_send_reg_address2_r:	; read LSB byte
 	rcall twi_ack_diable
 	
-	; load calibration address from stack
+	; load LSB address from stack
+	sbiw r26, 0x02
 	ld r24, X
+	adiw r26, 0x02
 	rcall twi_send_byte
 	
-	; read calibration data
+	; read data
 	rcall twi_read_data
 	
 	; save data to LSB return value
-	sbiw r26, 0x02
+	sbiw r26, 0x04
 	st X, r24
-	adiw r26, 0x02
+	adiw r26, 0x04
 	
 	rcall twi_get_status
 	
 	cpi r24, TWI_MR_DATA_R_NACK
-	breq _bmp_085_read_calibration_exit
+	breq _bmp_085_read_data_exit
 	rcall bmp_085_error_handler
 	
-_bmp_085_read_calibration_exit:	
+_bmp_085_read_data_exit:	
 	
 	rcall twi_send_stop_condition
+	
+	; restore r23 from the stack
+	ld r23, X
 
 	; resore return value from stack
-	sbiw r26, 0x01 		; move to correct stack address
+	sbiw r26, 0x03 		; move to correct stack address
 	ld r25, X			; load MSB data from stack	
 	sbiw r26, 0x01
 	ld r24, X			; load LSB data from stack
-	adiw r26, 0x02		; set base pointer back to initial value
+	adiw r26, 0x04		; set base pointer back to initial value
 
 	; set stack pointer to base pointer
 	out SPL, r26	
 	out SPH, r27
 	pop r27
 	pop r26
-	
 	ret
 	
 ; resets actions and states variables values
