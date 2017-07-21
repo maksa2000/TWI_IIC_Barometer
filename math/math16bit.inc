@@ -1,5 +1,6 @@
 MATH_16BIT = 0		; define MATH_16BIT
 
+.text
 ; do 16 bit unsigned integer division 
 ; value1 - r29:r28 dividend
 ; value2 - r31:r30 devider
@@ -90,4 +91,38 @@ mul_uint_16bit:
 	adc r27, r2		; add with carry bit (zero from r2 register)
 	
 	pop r2
+	ret
+	
+; perform logical shift left (lsl instruction) on 16 bit value
+; 16 bit value recieved through r25:r24 registers 
+; r25 - MSB
+; r24 - LSB
+; function will return logical shift result in r25:r24 registers
+lsl_uint_16bit:
+	lsl r25
+	lsl r24
+	
+	brcc _lsl_uint_16bit_exit 			;  Branch if Carry Cleared
+	
+	; set first bit in r25 register
+	ori r25, 0x01
+	
+_lsl_uint_16bit_exit:
+	ret
+	
+; perform logical shift right (lsr instruction) on 16 bit value
+; 16 bit value recieved through r25:r24 registers 
+; r25 - MSB
+; r24 - LSB
+; function will return logical shift result in r25:r24 registers
+lsr_uint_16bit:	
+	lsr r24
+	lsr r25
+	
+	brcc _lsr_uint_16bit_exit 			;  Branch if Carry Cleared
+	
+	; if Carry flag is 1, set 1 to 7th bit of r24 register
+	ori r24, 0x80
+	
+_lsr_uint_16bit_exit:
 	ret

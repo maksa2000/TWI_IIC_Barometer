@@ -59,6 +59,10 @@ jmp return_from_interrupt					; 0x0032
 .include "bmp_085_module/bmp_085.inc"
 .endif
 
+.ifndef MATH_16BIT
+.include "math/math16bit.inc"
+.endif
+
 .text
 ;.balign 2	; this will align main function to even byte (otherwise code is not executable)
 main:
@@ -99,8 +103,8 @@ read_bmp085_sensor_values:
 	push r24
 	push r25
 	
-	ldi r24, BMP085_PRES0_CTRL_ADDR
-	;ldi r24, BMP085_TEMP_CTRL_ADDR
+	;ldi r24, BMP085_PRES0_CTRL_ADDR
+	ldi r24, BMP085_TEMP_CTRL_ADDR
 	rcall bmp_085_request_sensor_data
 	
 	rcall delayFunc
@@ -116,7 +120,13 @@ read_bmp085_sensor_values:
 	rcall send_to_usart
 	pop r24
 	rcall send_to_usart
+	push r24
+	ldi r24, 0x00
+	rcall send_to_usart
+	pop r24
 	; debug <--
+	
+	rcall bmp_085_calc_temperature
 	
 	pop r25
 	pop r24
@@ -138,8 +148,8 @@ read_bmp085_calibrations:
 	ldi r26, BMP085_AC1_MSB
 	
 	; initial Y register
-	ldi r28, pm_lo8(bmp085_calibration_values)		; not sure what is difference, but seems that pm_lo8 is used in memory operations
-	ldi r29, pm_hi8(bmp085_calibration_values)
+	ldi r28, lo8(bmp085_calibration_values)		; not sure what is difference, but seems that pm_lo8 is used in memory operations
+	ldi r29, hi8(bmp085_calibration_values)
 	
 	; initial counter
 	ldi r16, 0x0B				; 11 dec

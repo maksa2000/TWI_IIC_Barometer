@@ -8,6 +8,10 @@ BMP_085_MODULE = 0
 .include "atmega328p_core/watchdog.inc"
 .endif
 
+.ifndef MATH_16BIT
+.include "math/math16bit.inc"
+.endif
+
 .text
 .equ BMP085_MODULE_ADDR_W, 0xEE
 .equ BMP085_MODULE_ADDR_R, 0xEF
@@ -326,39 +330,10 @@ bmp_085_reset_actions_and_states:
 	pop r26
 	ret
 	
-; this function should be executed to process different twi statuses
-bmp_085_process_twi_status:
-	push r16
-	push r17
-	
-	;lds r16, twi_current_state
-	;lds r17, twi_current_action
-
-	;cpi r17, READ_CALIBRATION_ACTION
-	;breq _bmp_085_process_twi_status_read_data
-	
-	;cpi r17, READ_DATA_ACTION
-	;breq _bmp_085_process_twi_status_read_data
-	
-	;cpi r17, WRITE_DATA_ACTION
-	;breq _bmp_085_process_twi_status_write_data
-
-;_bmp_085_process_twi_status_read_data:
-;	rjmp _bmp_085_process_twi_status_exit
-	
-;_bmp_085_process_twi_status_write_data:
-;	rjmp _bmp_085_process_twi_status_exit
-	
-;_bmp_085_process_twi_status_exit:
-	pop r17
-	pop r16
-	ret
-	
 ; error handler function
 ; this function does not take nor recieve parameters
 bmp_085_error_handler:
 	push r16
-	;rcall flash_led
 	; if action equals read calibrations restart device
 	lds r16, twi_current_action
 	cpi r16, READ_CALIBRATION_ACTION
@@ -374,18 +349,206 @@ bmp_085_device_reset:
 	rcall watchdog_init_reset_mode
 	sleep
 	ret	
-	
-; store memory pointer to memory location
-; memory location (destination) must be set in X register
-; pointer to store (source), must be set in Y register
-; function does not return any value
-bmp_085_store_pointer_to_mem:
-	st X, r28
-	adiw r26, 0x01		; move to high byte
-	st X, r29
-	ret
 
-bmp_085_get_temperature:
+; This function recieve UT value through r25:r24 registers
+; r25 - temperature MSB 
+; r24 - temperature LSB
+; this function return actual temperature in r25:r24 registers
+; r25 - temperature MSB
+; r24 - temperature LSB
+bmp_085_calc_temperature:
+	; save values of temporary registers
+	push r16
+	push r17
+	push r18
+	push r19
+	
+	; save state of X register
+	push r26
+	push r27
+	
+	; save state of Y register
+	push r28
+	push r29
+	
+	; save base pointer value
+	in r26, SPL	
+	in r27, SPH
+	
+	; save UT temperature value to the stack
+	push r25		; MSB
+	push r24		; LSB
+	
+	; reserve space in the stack for 3 32bit variables and 1 16bit variable
+	sbiw r26, 0x10	; 2 bites was already added to stack so I should increase X register by 16 bytes (14 + 2)
+	out SPL, r26
+	out SPH, r27
+	adiw r26, 0x10
+	
+	; X1 - 32bit value
+	; X1 byte 4 - [base + 0x02]
+	; X1 byte 3 - [base + 0x03]
+	; X1 byte 2 - [base + 0x04]
+	; X1 byte 1 - [base + 0x05]
+	; X2 - 32 bit value
+	; X2 byte 4 - [base + 0x06]
+	; X2 byte 3 - [base + 0x07]
+	; X2 byte 2 - [base + 0x08]
+	; X2 byte 1 - [base + 0x09]
+	; B5 - 32 bit value
+	; B5 byte 4 - [base + 0x0A]
+	; B5 byte 4 - [base + 0x0B]
+	; B5 byte 4 - [base + 0x0C]
+	; B5 byte 4 - [base + 0x0D]
+	; T MSB - [base + 0x0E]
+	; T LSB - [base + 0x0F]
+	
+	; initialize Y register with beginning of bmp085_calibration_values array
+	ldi r29, hi8(bmp085_calibration_values)
+	ldi r28, lo8(bmp085_calibration_values)
+	
+	; begining of X1 calculation
+	
+	push r28
+	push r29
+	push r30
+	push r31
+	
+	; calculate UT - AC6
+	; load value of AC6 from memory to first argument of sub_uint_16bit function
+	adiw r28, 0x0A
+	ld r31, Y			; MSB
+	adiw r28, 0x01			
+	ld r30, Y			; LSB
+	sbiw r28, 0x0B
+	
+	; load UT value to r29:r28 registers
+	ld r29, X
+	sbiw r26, 0x01
+	ld r28, X
+	adiw r26, 0x01
+	
+	rcall sub_uint_16bit
+	
+	; move result to temporary registers
+	mov r17, r25
+	mov r16, r24
+	
+	pop r31
+	pop r30
+	pop r29
+	pop r28
+	
+	; calculare TEMP value * AC5
+	push r28
+	push r29
+	push r30
+	push r31
+	
+	; load value2 with temporary value
+	mov r31, r17
+	mov r30, r16
+	
+	; load temporary value with AC5 value
+	adiw r28, 0x08
+	ld r17, Y
+	adiw r28, 0x01
+	ld r16, Y
+	sbiw r28, 0x09
+	
+	; move AC5 from temporary registers to value1 registers
+	mov r29, r17
+	mov r28, r16
+	
+	push r26
+	push r27
+	
+	rcall mul_uint_16bit
+	
+	; move result to temporary registers
+	mov r19, r27
+	mov r18, r26
+	mov r17, r25
+	mov r16, r24
+	
+	pop r27
+	pop r26
+	
+	pop r31
+	pop r30
+	pop r29
+	pop r28
+	
+	; shift right temporary value for 15 positions
+	mov r16, r17
+	; reset all bits in r16 except bit 0
+	andi r16, 0x01
+	
+	; move 7 lowest bits from r18 to r16
+	mov r17, r18
+	lsl r17
+	or r16, r17
+	
+	; set 7th bit of r18 to 0th bit of r17
+	mov r17, r18
+	rol r17					; move 7th bit of r17 to Carry flag
+	rol r17					; move bit from Carry flag to zero bit
+	andi r17, 0x01			; clear all bits except bit 0
+	
+	; move 7 lowest bits from r19 to r17
+	mov r18, r19
+	lsl r18
+	or r17, r18
+	
+	; set 7th bit of r19 to 0th bit of r18
+	mov r18, r19
+	rol r18					; move 7th bit of r18 to Carry flag
+	rol r18					; move bit from Carry flag to zero bit
+	andi r18, 0x01			; clear all bits except bit 0
+	
+	clr r19
+	
+	; save result to appropriate position in the stack
+	sbiw r26, 0x02
+	st X, r19
+	sbiw r26, 0x01
+	st X, r18
+	sbiw r26, 0x01
+	st X, r17
+	sbiw r26, 0x01
+	st X, r16
+	adiw r26, 0x05
+	
+	; end of X1 calculation
+	
+	; dbg
+	push r24
+	mov r24, r19
+	rcall send_to_usart
+	mov r24, r18
+	rcall send_to_usart
+	mov r24, r17
+	rcall send_to_usart
+	mov r24, r16
+	rcall send_to_usart
+	pop r24
+	; dbg
+	
+	; set stack pointer to base pointer
+	out SPL, r26	
+	out SPH, r27
+
+	pop r29
+	pop r28
+	
+	pop r27
+	pop r26
+	
+	pop r19
+	pop r18
+	pop r17
+	pop r16
+	
 	ret
 	
 ; watchdog timeout interrupt
@@ -437,36 +600,36 @@ twi_mr_states_queue:			; master recieve states
 
 ; colibration data values
 bmp085_calibration_values:
-bmp085_ac1_val:
+;bmp085_ac1_val:
 .byte 0
 .byte 0
-bmp085_ac2_val:
+;bmp085_ac2_val:
 .byte 0
 .byte 0
-bmp085_ac3_val:
+;bmp085_ac3_val:
 .byte 0
 .byte 0
-bmp085_ac4_val:
+;bmp085_ac4_val:
 .byte 0
 .byte 0
-bmp085_ac5_val:
+;bmp085_ac5_val:
 .byte 0
 .byte 0
-bmp085_ac6_val:
+;bmp085_ac6_val:
 .byte 0
 .byte 0
-bmp085_b1_val:
+;bmp085_b1_val:
 .byte 0
 .byte 0
-bmp085_b2_val:
+;bmp085_b2_val:
 .byte 0
 .byte 0
-bmp085_mb_val:
+;bmp085_mb_val:
 .byte 0
 .byte 0
-bmp085_mc_val:
+;bmp085_mc_val:
 .byte 0
 .byte 0
-bmp085_md_val:
+;bmp085_md_val:
 .byte 0
 .byte 0
