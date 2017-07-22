@@ -1,5 +1,13 @@
 MATH_16BIT = 0		; define MATH_16BIT
 
+.ifndef MATH_8BIT
+.include "math/math8bit.inc"
+.endif
+
+.ifndef ATMEGA328P_CONSTANTS
+.include "atmega328p_core/const_codes.inc"
+.endif
+
 .text
 ; do 16 bit unsigned integer division 
 ; value1 - r29:r28 dividend
@@ -7,18 +15,36 @@ MATH_16BIT = 0		; define MATH_16BIT
 ; function return result in r25:r24 and r27:r28 registers
 ; r25:r24 - integer result of division
 ; r27:r26 - reminder of division
-div_unit_16bit:
-	push r16
-	push r17
-; TODO: create this functionality
-	clr r17
-div_unit_16bit_loop:
+div_unit_16bit:		
+	; Do not save state of X register, because it is used for returning values
 	
-
-	pop r17
-	pop r16
+	; set Y as base pointer register
+	in r27, SPH
+	in r26, SPL
+	
+	; save value1 to the stack
+	push r29		; [base]
+	push r28		; [base + 0x01]
+	
+	; save value2 to the stack
+	push r31		; [base + 0x02]
+	push r30		; [base + 0x03]
+	
+	; load MSB dividend from the stack
+	ld r28, X
+	
+	; load MSB divider from the stack
+	sbiw r26, 0x02
+	ld r29, X
+	adiw r26, 0x02
+	
+	rcall div_uint_8bit
+	
+	; respore stack pointer register
+	out SPH, r27
+	out SPL, r26
+	
 	ret
-
 
 ; subtract 2 16 bit unsigned integers (value1 - value2) and return 16 bit integer result
 ; value1 - 2 bits unsigned integer in registers r29:r28

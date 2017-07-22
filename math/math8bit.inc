@@ -1,5 +1,6 @@
 MATH_8BIT = 0		; define MATH_8BIT
 
+.text
 ; do 8 bit unsigned integer division
 ; value1 - r28 dividend
 ; value2 - r29 divider

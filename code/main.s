@@ -89,12 +89,37 @@ main:
 	
 	sei
 	
-	rcall read_bmp085_calibrations
+	; test invert sign
+	;ldi r27, 0x00
+	;ldi r26, 0xDC
+	;ldi r25, 0x00
+	;ldi r24, 0x00
+	
+	ldi r27, 0xFF
+	ldi r26, 0x24
+	ldi r25, 0x00
+	ldi r24, 0x00
+	
+	rcall invert_sign_32bit
+	
+	; debug -->
+	push r24
+	mov r24, r27
+	rcall send_to_usart
+	mov r24, r26
+	rcall send_to_usart
+	mov r24, r25
+	rcall send_to_usart
+	pop r24
+	rcall send_to_usart
+	; debug <--
+	
+	;rcall read_bmp085_calibrations
 	
 _sleep_loop:	
-	rcall watchdog_init_interrupt_mode
+	;rcall watchdog_init_interrupt_mode
 	sleep
-	rcall read_bmp085_sensor_values
+	;rcall read_bmp085_sensor_values
 	rjmp _sleep_loop
 	ret
 	

@@ -12,6 +12,10 @@ BMP_085_MODULE = 0
 .include "math/math16bit.inc"
 .endif
 
+.ifndef MATH_32BIT
+.include "math/math32bit.inc"
+.endif
+
 .text
 .equ BMP085_MODULE_ADDR_W, 0xEE
 .equ BMP085_MODULE_ADDR_R, 0xEF
@@ -520,6 +524,9 @@ bmp_085_calc_temperature:
 	adiw r26, 0x05
 	
 	; end of X1 calculation
+	
+	; X2 calculation
+	
 	
 	; dbg
 	push r24
