@@ -117,16 +117,16 @@ main:
 	; debug <--
 	
 	; debug reminder -->
-	;push r24
-	;mov r24, r29
-	;rcall send_to_usart
-	;mov r24, r28
-	;rcall send_to_usart
-	;mov r24, r27
-	;rcall send_to_usart
-	;mov r24, r26
-	;rcall send_to_usart
-	;pop r24
+	push r24
+	mov r24, r29
+	rcall send_to_usart
+	mov r24, r28
+	rcall send_to_usart
+	mov r24, r27
+	rcall send_to_usart
+	mov r24, r26
+	rcall send_to_usart
+	pop r24
 	; debug <--
 	
 	;rcall read_bmp085_calibrations
