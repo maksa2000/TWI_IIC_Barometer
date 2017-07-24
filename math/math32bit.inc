@@ -26,6 +26,17 @@ div_uint_32bit:
 	in r31, SPH
 	in r30, SPL
 	
+	; dbg
+	;push r24
+	;mov r24, r31
+	;rcall send_to_usart
+	;mov r24, r30
+	;rcall send_to_usart
+	;clr r24
+	;rcall send_to_usart
+	;pop r24
+	; dbg
+	
 	; save dividend to the stack
 	push r25		; [base] 		MSB
 	push r24		; [base + 0x01]
@@ -39,10 +50,10 @@ div_uint_32bit:
 	push r26		; [base + 0x07] LSB
 	
 	; reserve space in the stack for other values
-	sbiw r30, 0x16	; 8 bytes already pushed and 14 bytes should be reserved
+	sbiw r30, 0x1A	; 8 bytes already pushed and 18 bytes should be reserved
 	out SPH, r31
-	out SPH, r30
-	adiw r30, 0x16
+	out SPL, r30
+	adiw r30, 0x1A
 	
 	; [base + 0x08] - result MSB
 	; [base + 0x09]
@@ -58,6 +69,10 @@ div_uint_32bit:
 	; [base + 0x13]
 	; [base + 0x14]
 	; [base + 0x15]	- intermediate value LSB 
+	; [base + 0x16] - shifted divider MSB
+	; [base + 0x17]
+	; [base + 0x18]
+	; [base + 0x19] - shifted divider LSB
 	
 	; initial reminder with dividend value (NB! should be before any changes appears in r25:r22 registers)
 	sbiw r30, 0x0C
@@ -93,13 +108,14 @@ div_uint_32bit:
 	st Z, r24
 	adiw r30, 0x0B
 	
-	; logic start
-	; creal temporary value of leading zeroes
+	; crear temporary value of leading zeroes
 	sbiw r30, 0x10
 	st Z, r24
 	sbiw r30, 0x01
 	st Z, r24
-	adiw r30, 0x11	
+	adiw r30, 0x11
+	
+	; logic start
 	
 	; count leading zeroes in dividend
 	ldi r25, 0x04						; set counter to size of dividend
@@ -119,17 +135,24 @@ _div_uint_32bit_count_dividend_zeroes:
 	adc r31, r27
 	
 	rcall count_leading_zeroes_8bit
+	
+	
 
-	sbiw r30, 0x0C
+	sbiw r30, 0x10
 	ld r16, Z
 	add r16, r24
 	st Z, r16
-	adiw r30, 0x0C
+	adiw r30, 0x10
+	
+	; if found zeroes less then 8, should exit from this loop
+	cpi r24, 0x08
+	brne _div_uint_32bit_count_divider_zeroes_init
 	
 	inc r26	
 	dec r25
 	brne _div_uint_32bit_count_dividend_zeroes
 	
+_div_uint_32bit_count_divider_zeroes_init:
 	; count leading zeroes in divider
 	ldi r25, 0x04						; set counter to size of dividend
 	ldi r26, 0x04						; r26 register will be used as displacement for next 8bit element (0x04 is initial displacement for divider)
@@ -149,29 +172,36 @@ _div_uint_32bit_count_divider_zeroes:
 	
 	rcall count_leading_zeroes_8bit
 
-	sbiw r30, 0x0C
+	sbiw r30, 0x11
 	ld r16, Z
 	add r16, r24
 	st Z, r16
-	adiw r30, 0x0C
+	adiw r30, 0x11
+	
+	; if found zeroes less then 8, should exit from this loop
+	cpi r24, 0x08
+	brne _div_uint_32bit_count_subtraction
 	
 	inc r26
 	dec r25
 	brne _div_uint_32bit_count_divider_zeroes
 	
+_div_uint_32bit_count_subtraction:
 	; subtract zero bits in dividend from zero bits in divider
-	sbiw r30, 0x0C
+	sbiw r30, 0x10
 	ld r24, Z
-	adiw r30, 0x01
+	sbiw r30, 0x01
 	ld r25, Z
-	sbiw r30, 0x0D
+	adiw r30, 0x11
 	
-	sub r24, r25
-	brmi _div_uint_32bit_exit				; if leading zeroes in dividend more that in divider I should exit with 0 in result and dividend in reminder
-
+	sub r25, r24							; because I'm counting zeroes, I should subtract leading zeroes in dividend from leading zeroes in divider to get correct result
+	
+	sbrc r25, 0x07							; if sign bit is set, than exit					
+	rjmp _div_uint_32bit_exit				; if leading zeroes in dividend more that in divider I should exit with 0 in result and dividend in reminder
+	
 	; save counter subtraction result to [base + 0x10]
 	sbiw r30, 0x10
-	st Z, r24
+	st Z, r25
 	adiw r30, 0x10
 	
 	; restore divider [base + 0x04] from stack to r29:r26 registers
@@ -200,6 +230,17 @@ _div_uint_32bit_shift_divider_loop:
 			
 	dec r16												; decrement zero counter, so it will show exact number of zeroes before first 1
 	brne _div_uint_32bit_shift_divider_loop
+	
+	; store shifted divider to the stack
+	sbiw r30, 0x16
+	st Z, r29
+	sbiw r30, 0x01
+	st Z, r28
+	sbiw r30, 0x01
+	st Z, r27
+	sbiw r30, 0x01
+	st Z, r26
+	adiw r30, 0x19
 	
 _div_uint_32bit_division_begining_label:
 	; store value from previous step to reminder [base + 0x0C]
@@ -239,7 +280,20 @@ _div_uint_32bit_division_main_loop:
 	rol r28
 	rol r29
 	
-	; store result to the stack
+	; dbg result -->
+	;push r24
+	;mov r24, r29
+	;rcall send_to_usart
+	;mov r24, r28
+	;rcall send_to_usart
+	;mov r24, r27
+	;rcall send_to_usart
+	;mov r24, r26
+	;rcall send_to_usart
+	;pop r24
+	; dbg <--
+	
+	; store shifted result to the stack
 	sbiw r30, 0x08
 	st Z, r29
 	sbiw r30, 0x01
@@ -250,16 +304,16 @@ _div_uint_32bit_division_main_loop:
 	st Z, r26
 	adiw r30, 0x0B
 	
-	; restore shifted division result from stack to r29:r26
-	sbiw r30, 0x08
+	; load shifted divider from the stack
+	sbiw r30, 0x16
 	ld r29, Z
 	sbiw r30, 0x01
-	ld r28, 0x01
+	ld r28, Z
 	sbiw r30, 0x01
-	ld r27, 0x01
+	ld r27, Z
 	sbiw r30, 0x01
 	ld r26, Z
-	adiw r30, 0x0B
+	adiw r30, 0x19
 	
 	; restore intermediate result from stack [base + 0x12] to r25:r22
 	sbiw r30, 0x12
@@ -279,16 +333,30 @@ _div_uint_32bit_division_main_loop:
 	sbc r24, r28
 	sbc r25, r29
 	
-	and r22, r22										; needed to set Sign flag is any
+	;and r22, r22										; needed to set Sign flag is any
+	and r25, r25
 	brmi _div_uint_32bit_division_main_loop_continue	; branch if result negative
 	
-	; if result greater that 0, set appropriate bit in to result (result is rotating during the loop, so bit should be always set to position 0)
+	; if result >= 0
+	
+	; save substraction result to intermediate result [base + 0x12]
+	sbiw r30, 0x12
+	st Z, r25
+	sbiw r30, 0x01
+	st Z, r24
+	sbiw r30, 0x01
+	st Z, r23
+	sbiw r30, 0x01
+	st Z, r22
+	adiw r30, 0x15
+	
+	; set appropriate bit in to result (result is rotating during the loop, so bit should be always set to position 0)
 	push r16
-	sbiw r30, 0x15
+	sbiw r30, 0x0B
 	ld r16, Z	
 	ori r16, 0x01
 	st Z, r16
-	adiw r30, 0x15
+	adiw r30, 0x0B
 	pop r16
 	
 	; save subtraction result to reminder [base + 0x0C] in stack
@@ -312,6 +380,17 @@ _div_uint_32bit_division_main_loop_continue:
 	ror r28
 	ror r27
 	ror r26
+	
+	; store shifted divider to the stack
+	sbiw r30, 0x16
+	st Z, r29
+	sbiw r30, 0x01
+	st Z, r28
+	sbiw r30, 0x01
+	st Z, r27
+	sbiw r30, 0x01
+	st Z, r26
+	adiw r30, 0x19
 	
 	rjmp _div_uint_32bit_division_main_loop
 	
@@ -338,6 +417,15 @@ _div_uint_32bit_exit:
 	sbiw r30, 0x01
 	ld r26, Z
 	adiw r30, 0x0F
+	
+	; dbg
+	;push r24
+	;mov r24, r31
+	;rcall send_to_usart
+	;mov r24, r30
+	;rcall send_to_usart
+	;pop r24
+	; dbg
 
 	; restore stack pointer from base pointer
 	out SPH, r31

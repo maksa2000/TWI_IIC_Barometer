@@ -59,8 +59,8 @@ jmp return_from_interrupt					; 0x0032
 .include "bmp_085_module/bmp_085.inc"
 .endif
 
-.ifndef MATH_16BIT
-.include "math/math16bit.inc"
+.ifndef MATH_32BIT
+.include "math/math32bit.inc"
 .endif
 
 .text
@@ -89,29 +89,44 @@ main:
 	
 	sei
 	
-	; test invert sign
-	;ldi r27, 0x00
-	;ldi r26, 0xDC
-	;ldi r25, 0x00
-	;ldi r24, 0x00
-	
-	ldi r27, 0xFF
-	ldi r26, 0x24
-	ldi r25, 0x00
+	; test 32bit division
+	ldi r25, 0x0A
 	ldi r24, 0x00
+	ldi r23, 0x00
+	ldi r22, 0x00
 	
-	rcall invert_sign_32bit
+	ldi r29, 0x00
+	ldi r28, 0x03
+	ldi r27, 0x00
+	ldi r26, 0x00
 	
-	; debug -->
+	rcall div_uint_32bit
+	
+	; debug result -->
 	push r24
-	mov r24, r27
-	rcall send_to_usart
-	mov r24, r26
-	rcall send_to_usart
 	mov r24, r25
 	rcall send_to_usart
 	pop r24
 	rcall send_to_usart
+	push r24
+	mov r24, r23
+	rcall send_to_usart
+	mov r24, r22
+	rcall send_to_usart
+	pop r24
+	; debug <--
+	
+	; debug reminder -->
+	;push r24
+	;mov r24, r29
+	;rcall send_to_usart
+	;mov r24, r28
+	;rcall send_to_usart
+	;mov r24, r27
+	;rcall send_to_usart
+	;mov r24, r26
+	;rcall send_to_usart
+	;pop r24
 	; debug <--
 	
 	;rcall read_bmp085_calibrations
