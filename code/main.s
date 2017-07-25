@@ -129,7 +129,7 @@ main:
 	pop r24
 	; debug <--
 	
-	;rcall read_bmp085_calibrations
+	rcall read_bmp085_calibrations
 	
 _sleep_loop:	
 	;rcall watchdog_init_interrupt_mode
