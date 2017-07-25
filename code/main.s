@@ -89,52 +89,12 @@ main:
 	
 	sei
 	
-	; test 32bit division
-	ldi r25, 0x0A
-	ldi r24, 0x00
-	ldi r23, 0x00
-	ldi r22, 0x00
-	
-	ldi r29, 0x00
-	ldi r28, 0x03
-	ldi r27, 0x00
-	ldi r26, 0x00
-	
-	rcall div_uint_32bit
-	
-	; debug result -->
-	push r24
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	rcall send_to_usart
-	push r24
-	mov r24, r23
-	rcall send_to_usart
-	mov r24, r22
-	rcall send_to_usart
-	pop r24
-	; debug <--
-	
-	; debug reminder -->
-	push r24
-	mov r24, r29
-	rcall send_to_usart
-	mov r24, r28
-	rcall send_to_usart
-	mov r24, r27
-	rcall send_to_usart
-	mov r24, r26
-	rcall send_to_usart
-	pop r24
-	; debug <--
-	
 	rcall read_bmp085_calibrations
 	
 _sleep_loop:	
-	;rcall watchdog_init_interrupt_mode
+	rcall watchdog_init_interrupt_mode
 	sleep
-	;rcall read_bmp085_sensor_values
+	rcall read_bmp085_sensor_values
 	rjmp _sleep_loop
 	ret
 	
@@ -154,19 +114,15 @@ read_bmp085_sensor_values:
 	ldi r24, BMP085_CONV_RESULT_LSB
 	rcall bmp_085_read_data
 	
-	; debug -->
-	push r24
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	rcall send_to_usart
-	push r24
-	ldi r24, 0x00
-	rcall send_to_usart
-	pop r24
-	; debug <--
-	
 	rcall bmp_085_calc_temperature
+	
+	; debug -->
+	;push r24
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
+	; debug <--
 	
 	pop r25
 	pop r24

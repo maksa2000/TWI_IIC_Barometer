@@ -6,6 +6,43 @@ MATH_32BIT = 0
 
 .text
 
+; Function recieve 16bit value in r23:r22 registers and extends it sing bit up to 32bit value
+; r23:r22 - velue to extends
+; r23 - MSB
+; r22 - LSB
+; Return 32bit value with extended sign in r25:r22 registers
+; r25 - MSB
+; r22 - LSB
+sign_extend_uint_32bit:
+	clr r24
+	clr r25
+	
+	sbrs r23, 0x07									; skip next instruction if sign bit is set
+	rjmp _sign_extend_uint_32bit_exit
+	
+	; load r25 and r24 registers with sign bit
+	ldi r24, 0xFF
+	ldi r25, 0xFF
+	
+_sign_extend_uint_32bit_exit:
+	ret
+
+; Perform addition of 2 32bit values
+; value1 - r25:r22 dividend
+; r25 - MSB
+; r22 - LSB
+; value2 - r29:r26 divider
+; r29 - MSB
+; r26 - LSB
+; function return result in r25:r22 registers
+; r25:r22 - integer result of addition
+add_uint_32bit:
+	add r22, r26
+	adc r23, r27
+	adc r24, r28
+	adc r25, r29
+	ret
+
 ; do 32 bit unsigned integer division
 ; value1 - r25:r22 dividend
 ; r25 - MSB
