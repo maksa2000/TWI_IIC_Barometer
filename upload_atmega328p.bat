@@ -1,0 +1,2 @@
+cls
+D:\Arduino\arduino_1.8.3\hardware\tools\avr/bin/avrdude -cusbasp -p atmega328p -B12 -CD:\Arduino\arduino_1.8.3\hardware\tools\avr/etc/avrdude.conf -Uflash:w:"C:\Users\ja\Dropbox\Important documents\Arduino projects\TWI_IIC_Barometer_GNU_Asm\main.hex":i
