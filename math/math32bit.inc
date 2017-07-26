@@ -63,17 +63,6 @@ div_uint_32bit:
 	in r31, SPH
 	in r30, SPL
 	
-	; dbg
-	;push r24
-	;mov r24, r31
-	;rcall send_to_usart
-	;mov r24, r30
-	;rcall send_to_usart
-	;clr r24
-	;rcall send_to_usart
-	;pop r24
-	; dbg
-	
 	; save dividend to the stack
 	push r25		; [base] 		MSB
 	push r24		; [base + 0x01]
@@ -504,7 +493,7 @@ invert_sign_32bit:
 	clc			; clear carry flag
 	
 	add r24, r16
-	ldi r16, 0x00
+	clr r16
 	adc r25, r16	; add carry bit if any
 	adc r26, r16	; add carry bit if any
 	adc r27, r16	; add carry bit if any
@@ -520,7 +509,7 @@ _invert_sign_32bit_set_positive:
 	clc		; clear carry flag
 	
 	sub r24, r16
-	ldi r16, 0x00
+	clr r16
 	sbc r25, r16		; subtract carry flag if any
 	sbc r26, r16		; subtract carry flag if any
 	sbc r27, r16		; subtract carry flag if any

@@ -116,13 +116,12 @@ read_bmp085_sensor_values:
 	
 	rcall bmp_085_calc_temperature
 	
-	; debug -->
-	;push r24
-	;mov r24, r25
-	;rcall send_to_usart
-	;pop r24
-	;rcall send_to_usart
-	; debug <--
+	; send temperature data to USART
+	push r24
+	mov r24, r25
+	rcall send_to_usart
+	pop r24
+	rcall send_to_usart
 	
 	pop r25
 	pop r24

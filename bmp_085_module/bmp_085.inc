@@ -389,13 +389,13 @@ bmp_085_calc_temperature:
 	push r24		; LSB
 	
 	; dbg trace temperature value that came from sensor
-	push r24
-	clr r24								; UT
-	rcall send_to_usart
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	rcall send_to_usart
+	;push r24
+	;clr r24								; UT
+	;rcall send_to_usart
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
 	; dbg
 	
 	; reserve space in the stack for 3 32bit variables and 1 16bit variable
@@ -449,14 +449,14 @@ bmp_085_calc_temperature:
 	sbiw r28, 0x0B
 	
 	; dbg
-	push r24
-	ldi r24, 0x01				; AC6
-	rcall send_to_usart
-	mov r24, r31
-	rcall send_to_usart
-	mov r24, r30
-	rcall send_to_usart
-	pop r24
+	;push r24
+	;ldi r24, 0x01				; AC6
+	;rcall send_to_usart
+	;mov r24, r31
+	;rcall send_to_usart
+	;mov r24, r30
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
 	; load UT value to r29:r28 registers
@@ -494,14 +494,14 @@ bmp_085_calc_temperature:
 	sbiw r28, 0x09
 	
 	; dbg
-	push r24
-	ldi r24, 0x02					; AC5
-	rcall send_to_usart
-	mov r24, r17
-	rcall send_to_usart
-	mov r24, r16
-	rcall send_to_usart
-	pop r24
+	;push r24
+	;ldi r24, 0x02					; AC5
+	;rcall send_to_usart
+	;mov r24, r17
+	;rcall send_to_usart
+	;mov r24, r16
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
 	; move AC5 from temporary registers to value1 registers
@@ -568,18 +568,18 @@ bmp_085_calc_temperature:
 	adiw r26, 0x05
 	
 	; dbg 
-	push r24
-	ldi r24, 0x03							; X1
-	rcall send_to_usart
-	mov r24, r19
-	rcall send_to_usart
-	mov r24, r18
-	rcall send_to_usart
-	mov r24, r17
-	rcall send_to_usart
-	mov r24, r16
-	rcall send_to_usart
-	pop r24
+	;push r24
+	;ldi r24, 0x03							; X1
+	;rcall send_to_usart
+	;mov r24, r19
+	;rcall send_to_usart
+	;mov r24, r18
+	;rcall send_to_usart
+	;mov r24, r17
+	;rcall send_to_usart
+	;mov r24, r16
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
 	; X2 calculation
@@ -591,6 +591,17 @@ bmp_085_calc_temperature:
 	ld r22, Y				; load LSB
 	sbiw r28, 0x13
 	
+	; dbg 
+	;push r24					; MC
+	;ldi r24, 0x04
+	;rcall send_to_usart
+	;mov r24, r23
+	;rcall send_to_usart
+	;mov r24, r22
+	;rcall send_to_usart
+	;pop r24
+	; dbg
+	
 	rcall sign_extend_uint_32bit
 	
 	; move sign extend result to temporary registers
@@ -600,14 +611,18 @@ bmp_085_calc_temperature:
 	mov r16, r22
 	
 	; dbg 
-	push r24					; sign extended MC
-	ldi r24, 0x04
-	rcall send_to_usart
-	mov r24, r17
-	rcall send_to_usart
-	mov r24, r16
-	rcall send_to_usart
-	pop r24
+	;push r24					;Sign xtended MC
+	;ldi r24, 0x05
+	;rcall send_to_usart
+	;mov r24, r19
+	;rcall send_to_usart
+	;mov r24, r18
+	;rcall send_to_usart
+	;mov r24, r17
+	;rcall send_to_usart
+	;mov r24, r16
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
 ; shift mc value left for 11 posotions
@@ -624,18 +639,18 @@ _bmp_085_calc_temperature_shift_mc_left_loop:
 	brne _bmp_085_calc_temperature_shift_mc_left_loop
 	
 	; dbg 
-	push r24					; shifted MC
-	ldi r24, 0x05
-	rcall send_to_usart
-	mov r24, r19
-	rcall send_to_usart
-	mov r24, r18
-	rcall send_to_usart
-	mov r24, r17
-	rcall send_to_usart
-	mov r24, r16
-	rcall send_to_usart
-	pop r24
+	;push r24					; shifted MC
+	;ldi r24, 0x06
+	;rcall send_to_usart
+	;mov r24, r19
+	;rcall send_to_usart
+	;mov r24, r18
+	;rcall send_to_usart
+	;mov r24, r17
+	;rcall send_to_usart
+	;mov r24, r16
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
 	; if sign bit of shifted mc is set should invert the value
@@ -669,20 +684,32 @@ _bmp_085_calc_temperature_shift_mc_left_loop:
 	pop r26
 	
 	; switch Sign inverted value
-	push r16
-	push r17
-	ldi r17, 0x01
+	
+	ldi r25, 0x01
 	
 	sbiw r26, 0x10
-	ld r16, X
-	eor r16, r17
-	st X, r16
+	ld r24, X
+	eor r24, r25
+	st X, r24
 	adiw r26, 0x10
-	
-	pop r17
-	pop r16
 
 _bmp_085_calc_temperature_save_mc_to_X2:
+
+	; dbg 
+	;push r24					; Inverted shifted MC
+	;ldi r24, 0x07
+	;rcall send_to_usart
+	;mov r24, r19
+	;rcall send_to_usart
+	;mov r24, r18
+	;rcall send_to_usart
+	;mov r24, r17
+	;rcall send_to_usart
+	;mov r24, r16
+	;rcall send_to_usart
+	;pop r24
+	; dbg
+
 	; save intermediate result to X2 variable
 	sbiw r26, 0x06
 	st X, r19
@@ -702,65 +729,28 @@ _bmp_085_calc_temperature_save_mc_to_X2:
 	sbiw r28, 0x15
 	
 	; dbg 
-	push r24
-	ldi r24, 0x06			; MD
-	rcall send_to_usart
-	mov r24, r23
-	rcall send_to_usart
-	mov r24, r22
-	rcall send_to_usart
-	pop r24
+	;push r24
+	;ldi r24, 0x08			; MD
+	;rcall send_to_usart
+	;mov r24, r23
+	;rcall send_to_usart
+	;mov r24, r22
+	;rcall send_to_usart
+	;pop r24
 	; dbg
 	
+	; Shouldn't invert MD value because it is using in addition, instead should invert result of addition if it is negative
 	rcall sign_extend_uint_32bit
 	
-	; if sign bit of sign extend md is set should invert the value
-	sbrs r25, 0x07											; skip next instruction if sign bit in register is set
-	rjmp _bmp_085_calc_temperature_save_sign_extended
-	
-	; save X and Y registers values to stack
-	push r26
-	push r27
-	push r28
-	push r29
-	
-	; set sign extended md to r27:r24 registers
-	mov r27, r25
-	mov r26, r24
-	mov r25, r23
-	mov r24, r22
-	
-	rcall invert_sign_32bit
-	
-	; move function result to r25:r22 registers
-	mov r22, r24
-	mov r23, r25
-	mov r24, r26
-	mov r25, r27
-	
-	; restore X and Y registers from the stack
-	pop r29
-	pop r28
-	pop r27
-	pop r26
-	
-	; switch Sign inverted value
-	push r16
-	push r17
-	ldi r17, 0x01
-	
-	sbiw r26, 0x10
-	ld r16, X
-	eor r16, r17
-	st X, r16
-	adiw r26, 0x10
-	
-	pop r17
-	pop r16
+	; save sign extended MD to the stack
+	push r22
+	push r23
+	push r24
+	push r25
 	
 	; dbg 
 	;push r24	
-	;ldi r24, 0x07				; Sign extended MD
+	;ldi r24, 0x09				; Sign extended MD
 	;rcall send_to_usart
 	;mov r24, r25
 	;rcall send_to_usart
@@ -774,13 +764,6 @@ _bmp_085_calc_temperature_save_mc_to_X2:
 	;pop r24
 	; dbg
 	
-_bmp_085_calc_temperature_save_sign_extended:
-	; save sign extended (or inversion) result to the stack
-	push r22
-	push r23
-	push r24
-	push r25
-	
 	; load X1 from the stack
 	sbiw r26, 0x02
 	ld r25, X
@@ -792,7 +775,7 @@ _bmp_085_calc_temperature_save_sign_extended:
 	ld r22, X
 	adiw r26, 0x05
 	
-	; restore sign extend result to temporary registers
+	; restore sign extend MD to temporary registers
 	pop r19
 	pop r18
 	pop r17
@@ -804,7 +787,7 @@ _bmp_085_calc_temperature_save_sign_extended:
 	push r28
 	push r29
 	
-	; move sign extended value from temporary registers to r29:r26 registers
+	; move sign extended (inverted) MD value from temporary registers to r29:r26 registers
 	mov r29, r19
 	mov r28, r18
 	mov r27, r17
@@ -812,28 +795,68 @@ _bmp_085_calc_temperature_save_sign_extended:
 	
 	rcall add_uint_32bit
 	
-	; dbg
-	push r24
-	ldi r24, 0x08							; X1 + MD result
-	rcall send_to_usart
-	mov r24, r25
-	rcall send_to_usart
-	pop r24
-	rcall send_to_usart
-	push r24
-	mov r24, r23
-	rcall send_to_usart
-	mov r24, r22
-	rcall send_to_usart	
-	pop r24
-	; dbg
-	
 	; restore X and Y registers from the stack
 	pop r29
 	pop r28
 	pop r27
 	pop r26
 	
+	; invert result of addition if it is negative
+	sbrs r25, 0x07					; if sign bit in r25 is skip next instruction
+	rjmp _bmp_085_calc_temperature_div_calculation
+	
+	; save X and Y registers to the stack
+	push r26
+	push r27
+	push r28
+	push r29
+	
+	; move addition result to r27:r24
+	mov r27, r25
+	mov r26, r24
+	mov r25, r23
+	mov r24, r22
+	
+	rcall invert_sign_32bit
+	
+	; save function reult to r25:r22 registers
+	mov r22, r24
+	mov r23, r25
+	mov r24, r26
+	mov r25, r27
+	
+	; restore X and Y registers
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	
+	; switch Sign inverted value
+	ldi r17, 0x01
+	
+	sbiw r26, 0x10
+	ld r16, X
+	eor r16, r17
+	st X, r16
+	adiw r26, 0x10
+	
+_bmp_085_calc_temperature_div_calculation:
+	; dbg
+	;push r24
+	;ldi r24, 0x0A							; X1 + MD result
+	;rcall send_to_usart
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
+	;push r24
+	;mov r24, r23
+	;rcall send_to_usart
+	;mov r24, r22
+	;rcall send_to_usart	
+	;pop r24
+	; dbg
+
 	; load temporary value from X2 
 	sbiw r26, 0x06
 	ld r19, X
@@ -857,21 +880,6 @@ _bmp_085_calc_temperature_save_sign_extended:
 	push r24
 	push r25
 	
-	; dbg
-	push r24
-	ldi r24, 0x09
-	rcall send_to_usart
-	mov r24, r19
-	rcall send_to_usart
-	mov r24, r18
-	rcall send_to_usart
-	mov r24, r17
-	rcall send_to_usart
-	mov r24, r16
-	rcall send_to_usart
-	pop r24
-	; dbg
-	
 	; move value from X2 variable to r25:r22
 	mov r25, r19
 	mov r24, r18
@@ -893,6 +901,69 @@ _bmp_085_calc_temperature_save_sign_extended:
 	pop r27
 	pop r26
 	
+	; check for Sign inverted variable, if it is true, invert sign of division and reset sing inverted variable
+	
+	; load Sign inverted variable value
+	sbiw r26, 0x10
+	ld r16, X
+	adiw r26, 0x10
+	
+	; if sign inverted is false, continue, otherwise invert the sign back
+	cpi r16, 0x00
+	breq _bmp_085_calc_temperature_div_calculation_x1_plus_x2
+	
+	; save X and Y registers
+	push r26
+	push r27
+	push r28
+	push r29
+	
+	; load r27:r24 registers with result of division
+	mov r27, r25
+	mov r26, r24
+	mov r25, r23
+	mov r24, r22
+	
+	rcall invert_sign_32bit
+	
+	; move invert sign function result to r25:r22 registers
+	mov r22, r24
+	mov r23, r25
+	mov r24, r26
+	mov r25, r27
+	
+	; restore X and Y registers
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	
+	; switch Sign inverted value
+	ldi r17, 0x01
+	
+	sbiw r26, 0x10
+	ld r16, X
+	eor r16, r17
+	st X, r16
+	adiw r26, 0x10
+	
+_bmp_085_calc_temperature_div_calculation_x1_plus_x2:	
+	; dbg
+	;push r24
+	;ldi r24, 0x0B				; Div result
+	;rcall send_to_usart
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
+	;push r24
+	;mov r24, r23
+	;rcall send_to_usart
+	;mov r24, r22
+	;rcall send_to_usart
+	;pop r24
+	; dbg
+
 	; save division result to X2 variable
 	sbiw r26, 0x06
 	st X, r25
@@ -904,59 +975,6 @@ _bmp_085_calc_temperature_save_sign_extended:
 	st X, r22
 	adiw r26, 0x09
 	
-	; check for inverted sign value
-	sbiw r26, 0x10
-	ld r16, X
-	adiw r26, 0x10
-	
-	; if inverted sign is false, go to b5 calculation
-	cpi r16, 0x00
-	breq _bmp_085_calc_temperature_calc_b5
-	
-	; save X and Y registers values to the stack
-	push r26
-	push r27
-	push r28
-	push r29
-	
-	; move division result to r27:r24 registers
-	mov r24, r26
-	mov r25, r27
-	mov r26, r28
-	mov r27, r29
-	
-	rcall invert_sign_32bit
-	
-	; move function result to r25:r22 registers
-	mov r22, r24
-	mov r23, r25
-	mov r24, r26
-	mov r25, r27
-	
-	; restore X and Y registers from the stack
-	pop r29
-	pop r28
-	pop r27
-	pop r26
-	
-	; save inversion result to X2 variable
-	sbiw r26, 0x06
-	st X, r25
-	sbiw r26, 0x01
-	st X, r24
-	sbiw r26, 0x01
-	st X, r23
-	sbiw r26, 0x01
-	st X, r22
-	adiw r26, 0x09
-	
-	; clear inverted sign variable
-	clr r16
-	sbiw r26, 0x10
-	st X, r16
-	adiw r26, 0x10
-	
-_bmp_085_calc_temperature_calc_b5:
 	; calculate B5 variable
 	; load X1 variable from the stack
 	sbiw r26, 0x02
@@ -980,21 +998,6 @@ _bmp_085_calc_temperature_calc_b5:
 	ld r16, X
 	adiw r26, 0x09
 	
-	; dbg
-	;push r24
-	;ldi r24, 0x09					; division result
-	;rcall send_to_usart
-	;mov r24, r19
-	;rcall send_to_usart
-	;mov r24, r18
-	;rcall send_to_usart
-	;mov r24, r17
-	;rcall send_to_usart
-	;mov r24, r16
-	;rcall send_to_usart
-	;pop r24
-	; dbg
-	
 	; save X and Y registers to the stack
 	push r26
 	push r27
@@ -1008,6 +1011,22 @@ _bmp_085_calc_temperature_calc_b5:
 	mov r26, r16
 	
 	rcall add_uint_32bit
+	
+	; dbg
+	;push r24
+	;ldi r24, 0x0C				; X1 + X2
+	;rcall send_to_usart
+	;mov r24, r25
+	;rcall send_to_usart
+	;pop r24
+	;rcall send_to_usart
+	;push r24
+	;mov r24, r23
+	;rcall send_to_usart
+	;mov r24, r22
+	;rcall send_to_usart
+	;pop r24
+	; dbg
 	
 	; restore X and Y registers values
 	pop r29
