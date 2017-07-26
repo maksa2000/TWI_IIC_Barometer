@@ -3,3 +3,5 @@ This is AVR Assembler code example for reading data from BMP085 barometer sensor
 Code is writen using GNU Assembler syntax and can be compiled with avr-gcc. 
 
 Example of compilation and uploading string can be found in compile.bat and upload.bat files.
+
+For now can read temperature and pressure data, but can calculate only temperature.
